@@ -1,0 +1,2169 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>滿屋設計 | 場次管理</title>
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="滿屋場次">
+  <meta name="theme-color" content="#7A5200">
+  <style>
+    /* ===== Reset ===== */
+    *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+    html { font-size: 16px; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'PingFang TC', 'Noto Sans TC', 'Microsoft JhengHei', sans-serif;
+      background: #FFFBEE;
+      color: #1A1200;
+      min-height: 100dvh;
+      max-width: 430px;
+      margin: 0 auto;
+      position: relative;
+      overflow-x: hidden;
+    }
+
+    /* ===== CSS Variables ===== */
+    :root {
+      --primary:       #C4860A;   /* 暖琥珀金 */
+      --primary-dark:  #7A5200;   /* 深琥珀，用於漸層深色端 */
+      --primary-light: #F5C030;   /* 亮金黃，hover/淺色強調 */
+      --gold:          #C9A227;   /* 婚禮金色裝飾 */
+      --gold-light:    #FFD966;   /* 淺金 */
+      --bg:            #FFFBEE;   /* 鵝黃底色 */
+      --card:          #FFFFFF;
+      --border:        #F0E0A0;   /* 暖黃邊框 */
+      --text:          #1A1200;   /* 暖近黑 */
+      --text-mid:      #5C4400;   /* 暖深棕 */
+      --text-light:    #735A00;   /* 深金棕輔助文字（WCAG AA 合格）*/
+      --success:       #10B981;
+      --danger:        #EF4444;
+      --warning:       #D97706;
+      --shadow:        0 2px 10px rgba(196,134,10,0.12);
+      --shadow-lg:     0 8px 32px rgba(196,134,10,0.22);
+    }
+
+    /* ===== Screens ===== */
+    .screen { display:none; min-height:100dvh; flex-direction:column; }
+    .screen.active { display:flex; }
+
+    /* ===== SETUP SCREEN ===== */
+    #setup-screen {
+      background: linear-gradient(160deg, var(--primary-dark) 0%, var(--primary) 60%, #F5C030 100%);
+      justify-content: center; align-items: center; padding: 2rem 1.5rem; gap: 0;
+    }
+    .setup-top { text-align:center; color:white; margin-bottom:2rem; }
+    .setup-top .logo-emoji { font-size:4rem; display:block; margin-bottom:.75rem; filter:drop-shadow(0 4px 12px rgba(0,0,0,.3)); }
+    .setup-top h1 { font-size:1.75rem; font-weight:800; letter-spacing:.1em; }
+    .setup-top p { font-size:.85rem; opacity:.75; margin-top:.25rem; }
+    .setup-card { background:white; border-radius:1.5rem; padding:1.75rem; width:100%; box-shadow:var(--shadow-lg); }
+    .setup-card h3 { color:var(--primary); font-size:1rem; margin-bottom:.5rem; }
+    .setup-card .hint { font-size:.78rem; color:var(--text-light); margin-bottom:1.25rem; line-height:1.5; }
+    .setup-input {
+      width:100%; padding:.75rem 1rem; border:2px solid var(--border); border-radius:.75rem;
+      font-size:.85rem; margin-bottom:1rem; outline:none; resize:none;
+      transition:border-color .2s; background:var(--bg); color:var(--text);
+    }
+    .setup-input:focus { border-color:var(--primary-light); background:white; }
+    .setup-btn {
+      width:100%; padding:.9rem; background:linear-gradient(135deg, var(--primary-light), var(--primary));
+      color:white; border:none; border-radius:.75rem; font-size:1rem; font-weight:700; cursor:pointer;
+      box-shadow:0 4px 14px rgba(196,134,10,.35); transition:transform .15s, box-shadow .15s;
+    }
+    .setup-btn:active { transform:scale(.97); box-shadow:0 2px 6px rgba(196,134,10,.3); }
+
+    /* ===== LOGIN SCREEN ===== */
+    #login-screen {
+      background: linear-gradient(160deg, var(--primary-dark) 0%, var(--primary) 60%, #F5C030 100%);
+      justify-content: center; align-items: center; padding: 2rem 1.5rem 3rem; gap: 0;
+    }
+    .login-logo { text-align:center; color:white; margin-bottom:2.5rem; }
+    .brand-icon { font-size:4rem; display:block; margin-bottom:.5rem; filter:drop-shadow(0 4px 16px rgba(0,0,0,.3)); }
+    .login-logo h1 { font-size:2rem; font-weight:800; letter-spacing:.15em; }
+    .login-logo p  { font-size:.9rem; opacity:.7; margin-top:.25rem; }
+
+    /* User Selector */
+    .user-selector { width:100%; }
+    .user-selector-label { color:rgba(255,255,255,.85); font-size:.9rem; text-align:center; margin-bottom:1rem; font-weight:600; }
+    .user-grid { display:grid; grid-template-columns:1fr 1fr; gap:.75rem; }
+    .user-btn {
+      padding:.85rem; background:rgba(255,255,255,.15); border:1.5px solid rgba(255,255,255,.3);
+      border-radius:1rem; color:white; font-size:1rem; font-weight:700; cursor:pointer;
+      transition:all .15s; backdrop-filter:blur(8px);
+    }
+    .user-btn:active { background:rgba(255,255,255,.3); transform:scale(.97); }
+
+    /* PIN Section */
+    .pin-section { width:100%; }
+    .user-greeting { color:white; font-size:1.1rem; font-weight:700; text-align:center; margin-bottom:1.25rem; }
+    .pin-error { color:#FCA5A5; font-size:.85rem; text-align:center; min-height:1.2em; margin-bottom:.5rem; }
+    .pin-display { display:flex; justify-content:center; gap:.75rem; margin-bottom:.5rem; }
+    .pin-dot { width:14px; height:14px; border-radius:50%; border:2px solid rgba(255,255,255,.5); transition:all .2s; }
+    .pin-dot.filled { background:white; border-color:white; transform:scale(1.1); }
+    .pin-label { color:rgba(255,255,255,.65); font-size:.78rem; text-align:center; margin-bottom:1.5rem; }
+    .keypad { display:grid; grid-template-columns:repeat(3,1fr); gap:.5rem; max-width:280px; margin:0 auto; }
+    .key {
+      aspect-ratio:1; border-radius:50%; border:1.5px solid rgba(255,255,255,.25);
+      background:rgba(255,255,255,.1); color:white; font-size:1.3rem; font-weight:600;
+      cursor:pointer; transition:background .08s, transform .08s; backdrop-filter:blur(8px);
+      display:flex; align-items:center; justify-content:center; flex-direction:column; gap:0;
+      touch-action:manipulation; /* 消除 300ms 點擊延遲 */ -webkit-tap-highlight-color:transparent;
+    }
+    .key:active { background:rgba(255,255,255,.3); transform:scale(.93); }
+    .key.empty { border:none; background:none; cursor:default; }
+    .key.del { font-size:1rem; }
+    .key-sub { font-size:.45rem; opacity:.7; letter-spacing:.05em; }
+    .back-to-user {
+      display:block; margin:.75rem auto 0; background:none; border:none;
+      color:rgba(255,255,255,.7); font-size:.85rem; cursor:pointer; text-decoration:underline;
+    }
+    .login-footer-btn {
+      position:fixed; bottom:1.5rem; left:50%; transform:translateX(-50%);
+      background:none; border:none; color:rgba(255,255,255,.5); font-size:.78rem; cursor:pointer; white-space:nowrap;
+    }
+
+    /* ===== MAIN SCREEN ===== */
+    .main-header { background:linear-gradient(135deg, var(--primary-dark), var(--primary)); color:white; padding:1rem 1rem .5rem; }
+    .main-header-top { display:flex; justify-content:space-between; align-items:center; margin-bottom:.75rem; }
+    .header-brand { font-size:1.05rem; font-weight:800; letter-spacing:.05em; }
+    .header-actions { display:flex; gap:.5rem; }
+    .header-btn {
+      width:2rem; height:2rem; border-radius:.5rem; border:1.5px solid rgba(255,255,255,.3);
+      background:rgba(255,255,255,.12); color:white; font-size:1rem; cursor:pointer;
+      display:flex; align-items:center; justify-content:center;
+      transition: opacity .2s;
+    }
+    .header-btn.spinning { opacity:.5; cursor:default; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+    .header-btn.spinning { animation: spin .8s linear infinite; }
+    .month-nav { display:flex; align-items:center; justify-content:center; gap:1rem; margin-bottom:.75rem; }
+    .month-nav-btn {
+      width:2rem; height:2rem; border-radius:50%; border:1.5px solid rgba(255,255,255,.3);
+      background:rgba(255,255,255,.12); color:white; font-size:1.2rem; cursor:pointer;
+      display:flex; align-items:center; justify-content:center;
+    }
+    .month-title { font-size:1.1rem; font-weight:700; min-width:7rem; text-align:center; }
+    .stats-bar { display:flex; gap:.75rem; overflow-x:auto; -webkit-overflow-scrolling:touch; padding:.25rem 0 .5rem; }
+    .stats-bar::-webkit-scrollbar { display:none; }
+    .stat-item { flex:0 0 auto; min-width:4rem; text-align:center; }
+    .stat-num { font-size:1.4rem; font-weight:800; }
+    .stat-label { font-size:.65rem; opacity:.8; white-space:nowrap; }
+
+    .filter-tabs { display:flex; overflow-x:auto; gap:.375rem; padding:.625rem 1rem; background:white; border-bottom:1px solid var(--border); }
+    .filter-tabs::-webkit-scrollbar { display:none; }
+    .filter-tab {
+      flex:0 0 auto; white-space:nowrap; padding:.4rem .9rem; border-radius:999px;
+      border:1.5px solid var(--border); background:white; color:var(--text-mid);
+      font-size:.82rem; cursor:pointer; transition:all .15s;
+    }
+    .filter-tab.active { background:var(--primary); color:white; border-color:var(--primary); }
+
+    .orders-list { flex:1; padding:.75rem 1rem 6rem; overflow-y:auto; }
+    .empty-state { text-align:center; padding:4rem 2rem; color:var(--text-light); }
+    .empty-icon { font-size:3rem; margin-bottom:.75rem; }
+    .empty-state p { font-size:.9rem; line-height:1.6; white-space:pre-wrap; }
+
+    /* Order Card */
+    .order-card {
+      display:flex; align-items:center; gap:.875rem; background:white;
+      border-radius:1rem; padding:.875rem; margin-bottom:.625rem;
+      border-left:4px solid var(--border); box-shadow:var(--shadow); cursor:pointer;
+      transition:transform .1s, box-shadow .1s;
+    }
+    .order-card:active { transform:scale(.99); box-shadow:none; }
+    .order-card.wedding  { border-left-color: #C9A227; }
+    .order-card.business { border-left-color: #C4860A; }
+    .order-card.other    { border-left-color: #10B981; }
+    .order-card.leave    { border-left-color: #D97706; }
+    .order-date-badge { flex:0 0 auto; text-align:center; min-width:2.5rem; }
+    .order-date-num  { font-size:1.5rem; font-weight:800; line-height:1; color:var(--primary); }
+    .order-date-day  { font-size:.65rem; color:var(--text-light); }
+    .order-date-month{ font-size:.65rem; color:var(--text-light); }
+    .order-info { flex:1; min-width:0; }
+    .order-client { font-size:.95rem; font-weight:700; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .order-tags   { display:flex; flex-wrap:wrap; gap:.25rem; margin:.2rem 0; }
+    .order-venue  { font-size:.78rem; color:var(--text-light); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .order-pm     { font-size:.75rem; color:var(--text-light); }
+    .order-deco   {
+      font-size:.74rem; font-weight:600;
+      color:#8B5E00;
+      background:#FFF3CD;
+      display:inline-block;
+      padding:.1rem .55rem;
+      border-radius:999px;
+      margin-top:.2rem;
+      max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+    }
+    .order-arrow  { font-size:1.2rem; color:var(--text-light); flex:0 0 auto; }
+
+    /* Tags */
+    .tag { display:inline-block; font-size:.72rem; font-weight:600; padding:.15rem .55rem; border-radius:999px; }
+    .tag-wedding  { background:#FFF0C0; color:#6B4900; }
+    .tag-business { background:#FFF3CD; color:#8B5E00; }
+    .tag-other    { background:#ECFDF5; color:#10B981; }
+    .tag-leave    { background:#FFFBEB; color:#D97706; }
+    .tag-lunch    { background:#FFF7ED; color:#EA580C; }
+    .tag-dinner   { background:#EFF6FF; color:#2563EB; }
+    .tag-evening  { background:#FFF3CD; color:#8B5E00; }
+
+    /* FAB */
+    .fab {
+      position:fixed; bottom:2rem; right:1.25rem; width:3.25rem; height:3.25rem;
+      border-radius:50%; background:linear-gradient(135deg, var(--primary-light), var(--primary));
+      color:white; font-size:1.75rem; border:none; cursor:pointer; line-height:1;
+      box-shadow:0 4px 16px rgba(196,134,10,.4); transition:transform .15s;
+      display:flex; align-items:center; justify-content:center;
+    }
+    .fab:active { transform:scale(.93); }
+
+    /* ===== ADD / EDIT SCREEN ===== */
+    .sub-header {
+      display:flex; align-items:center; gap:.75rem; padding:.875rem 1rem;
+      background:white; border-bottom:1px solid var(--border); position:sticky; top:0; z-index:10;
+    }
+    .back-btn {
+      width:2.25rem; height:2.25rem; border-radius:.625rem; border:1.5px solid var(--border);
+      background:var(--bg); color:var(--primary); font-size:1.35rem; cursor:pointer;
+      display:flex; align-items:center; justify-content:center; flex:0 0 auto;
+    }
+    .sub-header h2 { flex:1; font-size:1rem; font-weight:700; color:var(--primary); }
+    .sub-header-action {
+      padding:.5rem 1.1rem; background:var(--primary); color:white; border:none;
+      border-radius:.625rem; font-size:.88rem; font-weight:700; cursor:pointer;
+    }
+    .form-container { flex:1; overflow-y:auto; padding:.75rem 1rem 6rem; }
+    .form-section { background:white; border-radius:1rem; padding:1rem; margin-bottom:.75rem; box-shadow:var(--shadow); }
+    .form-section-title { font-size:.82rem; font-weight:700; color:var(--primary); margin-bottom:.875rem; letter-spacing:.03em; }
+    .form-field { margin-bottom:.875rem; }
+    .form-field:last-child { margin-bottom:0; }
+    .form-label { display:block; font-size:.78rem; font-weight:600; color:var(--text-mid); margin-bottom:.375rem; }
+    .required { color:var(--danger); margin-left:.2rem; }
+    .form-input {
+      width:100%; padding:.75rem 1rem; border:2px solid var(--border); border-radius:.75rem;
+      font-size:.88rem; outline:none; resize:none; transition:border-color .2s;
+      background:var(--bg); color:var(--text); appearance:none;
+    }
+    .form-input:focus { border-color:var(--primary-light); background:white; }
+    .date-row { display:flex; align-items:center; gap:.5rem; }
+    .weekday-badge {
+      flex:0 0 auto; padding:.65rem .8rem; background:var(--primary); color:white;
+      border-radius:.75rem; font-size:.82rem; font-weight:700; white-space:nowrap;
+    }
+    .radio-group { display:flex; flex-wrap:wrap; gap:.5rem; }
+    .radio-item { display:flex; align-items:center; }
+    .radio-item input[type=radio] { display:none; }
+    .radio-label {
+      padding:.45rem .9rem; border-radius:999px; border:1.5px solid var(--border);
+      font-size:.82rem; cursor:pointer; transition:all .15s; color:var(--text-mid); white-space:nowrap;
+    }
+    .radio-item input:checked + .radio-label { background:var(--primary); color:white; border-color:var(--primary); }
+
+    /* Staff Required Input */
+    .staff-req-row { display:flex; align-items:center; gap:.625rem; }
+    .staff-req-input {
+      width:5rem; padding:.75rem .5rem; border:2px solid var(--border); border-radius:.75rem;
+      font-size:1rem; font-weight:700; text-align:center; outline:none;
+      background:var(--bg); color:var(--text); -moz-appearance:textfield;
+    }
+    .staff-req-input::-webkit-outer-spin-button,
+    .staff-req-input::-webkit-inner-spin-button { -webkit-appearance:none; }
+    .staff-req-input:focus { border-color:var(--primary-light); background:white; }
+    .staff-req-label { font-size:.85rem; color:var(--text-mid); }
+
+    /* Staff Picker Trigger */
+    .staff-picker-btn {
+      width:100%; padding:.75rem 1rem; border:2px solid var(--border); border-radius:.75rem;
+      background:var(--bg); font-size:.88rem; color:var(--text-mid); text-align:left;
+      cursor:pointer; display:flex; align-items:center; justify-content:space-between;
+      transition:border-color .2s;
+    }
+    .staff-picker-btn:focus { border-color:var(--primary-light); }
+    .staff-tags-display { display:flex; flex-wrap:wrap; gap:.375rem; margin-top:.5rem; min-height:1.5rem; }
+    .staff-tag {
+      background:var(--primary); color:white; padding:.3rem .65rem; border-radius:999px;
+      font-size:.78rem; display:inline-flex; align-items:center; gap:.25rem;
+    }
+    .staff-tag-remove { cursor:pointer; opacity:.8; font-size:.8rem; line-height:1; padding:.1rem; }
+
+    /* Comparison trigger */
+    .comparison-trigger {
+      display:flex; align-items:center; gap:.5rem; margin-top:.75rem;
+      padding:.6rem .9rem; background:#FFF8DC; border-radius:.75rem; cursor:pointer;
+      border:none; width:100%; font-size:.82rem; color:var(--primary); font-weight:600;
+      transition:background .15s;
+    }
+    .comparison-trigger:active { background:#DDD6F0; }
+
+    /* ===== MODAL OVERLAY ===== */
+    .modal-overlay {
+      position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:5000;
+      display:flex; align-items:flex-end; justify-content:center;
+    }
+    .modal-overlay.hidden { display:none; }
+    .modal-overlay.center { align-items:center; }
+
+    /* Bottom Sheet Modal */
+    .modal-sheet {
+      background:white; border-radius:1.25rem 1.25rem 0 0; width:100%; max-width:430px;
+      max-height:85vh; display:flex; flex-direction:column; overflow:hidden;
+    }
+    .modal-header {
+      display:flex; align-items:center; justify-content:space-between;
+      padding:1rem 1.25rem; border-bottom:1px solid var(--border); flex:0 0 auto;
+    }
+    .modal-title { font-weight:700; color:var(--primary); font-size:1rem; }
+    .modal-close {
+      background:none; border:none; font-size:1.1rem; cursor:pointer;
+      color:var(--text-light); padding:.25rem .5rem; border-radius:.5rem;
+    }
+    .modal-scroll { flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; }
+    .modal-footer {
+      display:flex; align-items:center; justify-content:space-between;
+      padding:.875rem 1.25rem; border-top:1px solid var(--border); flex:0 0 auto; background:white;
+    }
+    .selected-count { font-size:.85rem; color:var(--text-mid); }
+    .modal-confirm-btn {
+      background:var(--primary); color:white; border:none; padding:.65rem 1.5rem;
+      border-radius:.75rem; font-weight:700; cursor:pointer; font-size:.9rem;
+    }
+
+    /* Staff Options Grid */
+    .staff-options-grid { padding:.875rem; display:flex; flex-wrap:wrap; gap:.5rem; }
+    .staff-chip {
+      padding:.5rem .9rem; border-radius:999px; border:2px solid var(--border);
+      background:white; font-size:.88rem; cursor:pointer; transition:all .15s; color:var(--text);
+    }
+    .staff-chip.selected { background:var(--primary); color:white; border-color:var(--primary); }
+    .staff-chip.conflicted { background:#F3F4F6; color:#9CA3AF; border-color:#E5E7EB; cursor:not-allowed; text-decoration:line-through; }
+    .staff-chip.other-btn { border-style:dashed; border-color:var(--primary-light); color:var(--primary); font-weight:600; }
+    .staff-chip.other-btn.open { background:var(--primary-light); color:white; border-style:solid; }
+    .conflict-notice {
+      margin:.25rem .875rem; padding:.5rem .875rem; background:#FEF3C7;
+      color:#92400E; font-size:.78rem; border-radius:.625rem; display:none;
+    }
+    .conflict-notice.show { display:block; }
+    .other-input-row {
+      display:none; align-items:center; gap:.5rem; padding:.375rem .875rem .875rem;
+    }
+    .other-input-row.show { display:flex; }
+    .other-input-row input {
+      flex:1; padding:.6rem .875rem; border:2px solid var(--border); border-radius:.625rem;
+      font-size:.88rem; outline:none; background:var(--bg);
+    }
+    .other-input-row input:focus { border-color:var(--primary-light); }
+    .other-add-btn {
+      padding:.6rem 1rem; background:var(--primary); color:white;
+      border:none; border-radius:.625rem; font-size:.85rem; font-weight:700; cursor:pointer;
+    }
+
+    /* Warning Modal */
+    .warning-center-box {
+      background:white; border-radius:1.25rem; width:88%; max-width:360px; padding:1.75rem;
+      text-align:center; box-shadow:var(--shadow-lg);
+    }
+    .warning-icon-big { font-size:3rem; margin-bottom:.75rem; display:block; }
+    .warning-modal-title { font-size:1.05rem; font-weight:800; color:var(--danger); margin-bottom:.625rem; }
+    .warning-modal-msg { font-size:.88rem; color:var(--text-mid); line-height:1.65; margin-bottom:1.25rem; white-space:pre-wrap; }
+    .warning-close-btn {
+      background:var(--danger); color:white; border:none; padding:.75rem 2rem;
+      border-radius:.75rem; font-size:.9rem; font-weight:700; cursor:pointer;
+    }
+
+    /* Comparison Modal */
+    .comparison-order-block { padding:.875rem; border-bottom:1px solid var(--border); }
+    .comparison-order-block:last-of-type { border-bottom:none; }
+    .comparison-order-header { font-weight:700; font-size:.95rem; color:var(--primary-dark); margin-bottom:.25rem; }
+    .comparison-order-sub { font-size:.78rem; color:var(--text-light); margin-bottom:.5rem; }
+    .comparison-chips { display:flex; flex-wrap:wrap; gap:.3rem; margin-bottom:.4rem; }
+    .comparison-chip { background:var(--primary); color:white; padding:.2rem .6rem; border-radius:999px; font-size:.78rem; }
+    .comparison-summary-bar {
+      display:inline-flex; align-items:center; gap:.3rem; font-size:.8rem;
+      padding:.3rem .7rem; border-radius:999px; background:#FFF8DC; color:var(--primary);
+    }
+    .comparison-summary-bar.warn { background:#FEE2E2; color:var(--danger); }
+    .available-staff-block { margin:.625rem .875rem 1rem; padding:.875rem; background:#FFF8DC; border-radius:.875rem; }
+    .available-title { font-weight:700; font-size:.88rem; color:var(--primary); margin-bottom:.5rem; }
+
+    /* ===== DETAIL SCREEN ===== */
+    .detail-body { flex:1; overflow-y:auto; padding:.875rem 1rem 6rem; }
+    .detail-section { background:white; border-radius:1rem; padding:1rem; margin-bottom:.75rem; box-shadow:var(--shadow); }
+    .detail-section-title { font-size:.8rem; font-weight:700; color:var(--primary); margin-bottom:.75rem; letter-spacing:.03em; }
+    .detail-row { display:flex; align-items:flex-start; gap:.5rem; padding:.375rem 0; border-bottom:1px solid var(--bg); }
+    .detail-row:last-child { border-bottom:none; }
+    .detail-label { flex:0 0 5rem; font-size:.78rem; color:var(--text-light); padding-top:.1rem; }
+    .detail-value { flex:1; font-size:.88rem; color:var(--text); font-weight:500; }
+    .detail-tags { display:flex; flex-wrap:wrap; gap:.3rem; }
+
+    /* Staff count badge */
+    .staff-count-badge {
+      display:inline-flex; align-items:center; gap:.25rem; margin-top:.3rem;
+      padding:.25rem .65rem; border-radius:999px; font-size:.78rem; font-weight:600;
+    }
+    .staff-count-badge.ok   { background:#D1FAE5; color:#065F46; }
+    .staff-count-badge.warn { background:#FEE2E2; color:#991B1B; }
+    .staff-count-badge.none { background:#FFF8DC; color:var(--primary); }
+
+    .created-at { font-size:.75rem; color:var(--text-light); text-align:center; padding:.5rem 0; }
+    .edit-btn {
+      display:block; width:100%; margin:.5rem 0; padding:.85rem;
+      background:var(--primary); color:white; border:none; border-radius:.875rem;
+      font-size:.95rem; font-weight:700; cursor:pointer; text-align:center;
+    }
+    .delete-btn {
+      display:block; width:100%; margin:.5rem 0; padding:.85rem;
+      background:#FEF2F2; color:var(--danger); border:1.5px solid #FECACA; border-radius:.875rem;
+      font-size:.95rem; font-weight:600; cursor:pointer; text-align:center;
+    }
+
+    /* History */
+    .history-section { background:white; border-radius:1rem; padding:1rem; margin-top:.75rem; box-shadow:var(--shadow); }
+    .history-title { font-size:.8rem; font-weight:700; color:var(--primary); margin-bottom:.75rem; }
+    .history-item { padding:.625rem 0; border-bottom:1px solid var(--bg); }
+    .history-item:last-child { border-bottom:none; }
+    .history-meta { display:flex; justify-content:space-between; align-items:center; margin-bottom:.25rem; }
+    .history-user { font-size:.78rem; font-weight:600; color:var(--primary); }
+    .history-time { font-size:.72rem; color:var(--text-light); }
+    .history-action { display:inline-block; font-size:.7rem; font-weight:700; padding:.1rem .5rem; border-radius:999px; margin-bottom:.2rem; }
+    .history-action.add    { background:#D1FAE5; color:#065F46; }
+    .history-action.edit   { background:#FFF8DC; color:var(--primary); }
+    .history-action.delete { background:#FEE2E2; color:var(--danger); }
+    .history-detail { font-size:.78rem; color:var(--text-mid); line-height:1.5; white-space:pre-wrap; }
+
+    /* ===== Loading ===== */
+    .loading-overlay {
+      position:fixed; inset:0; background:rgba(255,255,255,.85); z-index:9999;
+      display:none; align-items:center; justify-content:center; flex-direction:column; gap:.875rem;
+    }
+    .loading-overlay.active { display:flex; }
+    .loading-card { display:flex; flex-direction:column; align-items:center; gap:.875rem; }
+    .spinner {
+      width:2.5rem; height:2.5rem; border-radius:50%;
+      border:3px solid var(--border); border-top-color:var(--primary);
+      animation:spin .7s linear infinite;
+    }
+    @keyframes spin { to { transform:rotate(360deg); } }
+    .loading-text { font-size:.85rem; color:var(--text-mid); font-weight:600; }
+
+    /* ===== Toast ===== */
+    .toast {
+      position:fixed; bottom:5.5rem; left:50%; transform:translateX(-50%) translateY(80px);
+      background:#1A1200; color:white; padding:.625rem 1.25rem; border-radius:999px;
+      font-size:.82rem; z-index:10000; transition:transform .3s cubic-bezier(.34,1.56,.64,1), opacity .3s;
+      white-space:nowrap; box-shadow:0 4px 16px rgba(0,0,0,.25); opacity:0;
+    }
+    .toast.show { transform:translateX(-50%) translateY(0); opacity:1; }
+    .toast.success { background:var(--success); }
+    .toast.error   { background:var(--danger); }
+    .toast.warning { background:var(--warning); }
+
+    /* ===== Date Group & Staff Pool ===== */
+    .date-group { margin-bottom: .5rem; }
+    .date-group-header {
+      font-size: .75rem; font-weight: 700; color: var(--text-mid);
+      padding: .6rem .25rem .3rem; letter-spacing: .05em;
+    }
+    .staff-pool-panel {
+      background: white; border-radius: .875rem; margin-bottom: .5rem;
+      box-shadow: var(--shadow); border-left: 3px solid var(--primary-light);
+      transition: background .15s, box-shadow .15s;
+    }
+    .staff-pool-panel.drop-active { background: #FFF8DC; box-shadow: 0 0 0 2px var(--primary-light); }
+    .pool-panel-label {
+      font-size: .72rem; font-weight: 700; color: var(--primary);
+      padding: .45rem .875rem .15rem;
+    }
+    .pool-chips-row {
+      display: flex; flex-wrap: wrap; gap: .35rem;
+      padding: .2rem .875rem .6rem; min-height: 2.1rem;
+    }
+    .pool-empty-text { font-size: .75rem; color: var(--text-light); line-height: 2rem; }
+    .pool-chip {
+      background: white; color: #5C3E00;
+      border: 1.5px solid #C4860A;
+      padding: .28rem .7rem; border-radius: 999px; font-size: .82rem; font-weight: 600;
+      cursor: grab; user-select: none; touch-action: none; transition: opacity .15s;
+    }
+    .pool-chip.drag-source { opacity: .28; }
+
+    /* Card Staff Row (drop zone) */
+    .card-staff-row {
+      display: flex; flex-wrap: wrap; gap: .3rem; margin-top: .4rem;
+      padding: .3rem .4rem; border-radius: .5rem; min-height: 1.8rem;
+      border: 1.5px dashed transparent; transition: border-color .15s, background .15s;
+    }
+    .card-staff-row.drop-active { border-color: var(--primary-light); background: #FFF8DC; }
+    .card-staff-chip {
+      background: #F5C030; color: #3D2200;
+      padding: .2rem .65rem; border-radius: 999px; font-size: .78rem; font-weight: 700;
+      cursor: grab; user-select: none; touch-action: none; transition: opacity .15s;
+      display: inline-flex; align-items: center; gap: .15rem;
+      box-shadow: 0 1px 3px rgba(196,134,10,.25);
+    }
+    .card-staff-chip.drag-source { opacity: .28; }
+    .card-staff-remove {
+      display: inline-flex; align-items: center; justify-content: center;
+      margin-left: .1rem; font-size: .72rem; font-weight: 700;
+      color: rgba(196,134,10,.45); cursor: pointer;
+      width: 1.1rem; height: 1.1rem;
+      border-radius: 50%; background: rgba(196,134,10,.08);
+      line-height: 1; flex-shrink: 0;
+      transition: background .15s, color .15s;
+    }
+    .card-staff-remove:active { background: #FEE2E2; color: var(--danger); }
+
+    /* 詳情頁人員 chip（含安全 ✕ 按鈕，無拖曳衝突）*/
+    .detail-staff-chip {
+      display: inline-flex; align-items: center; gap: .35rem;
+      background: #F5C030; color: #3D2200;
+      border: none;
+      padding: .25rem .5rem .25rem .75rem;
+      border-radius: 999px; font-size: .82rem; font-weight: 700;
+      margin: .15rem .1rem;
+      box-shadow: 0 1px 3px rgba(196,134,10,.25);
+    }
+    .detail-staff-remove {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 1.3rem; height: 1.3rem; border-radius: 50%;
+      font-size: .72rem; font-weight: 700; cursor: pointer;
+      color: rgba(61,34,0,.55);
+      background: rgba(0,0,0,.08);
+      transition: background .15s, color .15s;
+    }
+    .detail-staff-remove:active { background: #FEE2E2; color: var(--danger); }
+    .card-staff-empty {
+      font-size: .72rem; color: var(--text-light); line-height: 1.8rem; font-style: italic;
+    }
+
+    /* Deco Style Selector */
+    .deco-select {
+      width: 100%; padding: .72rem 2.5rem .72rem 1rem;
+      border: 1.5px solid var(--border); border-radius: .75rem;
+      background: var(--bg); color: var(--text); font-size: .9rem;
+      appearance: none; -webkit-appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23C4860A' d='M6 8L0 0h12z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: right 1rem center;
+      outline: none; cursor: pointer; transition: border-color .2s;
+    }
+    .deco-select:focus { border-color: var(--primary-light); background-color: white; }
+    .deco-text-input { margin-top: .5rem; }
+
+    /* Staff Selector Bar */
+    .staff-selector-bar { margin-bottom: .5rem; }
+    .staff-add-dropdown {
+      width: 100%; padding: .6rem 1rem;
+      border: 1.5px solid var(--primary-light); border-radius: .875rem;
+      background: white; color: var(--primary);
+      font-size: .88rem; font-weight: 600; cursor: pointer;
+      appearance: none; -webkit-appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23C4860A' d='M6 8L0 0h12z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: right 1rem center;
+      box-shadow: var(--shadow);
+    }
+    .staff-add-dropdown:focus { outline: none; border-color: var(--primary); }
+
+    /* Pending chip (after dropdown selection, before drop) */
+    .pending-chip-area {
+      display: flex; align-items: center; gap: .5rem; flex-wrap: wrap;
+      transition: all .2s;
+    }
+    .pending-chip-area:not(:empty) {
+      margin-top: .35rem; padding: .45rem .75rem;
+      background: #FFF8E6; border-radius: .75rem;
+      border: 1.5px dashed var(--gold);
+    }
+    .pending-hint { font-size: .72rem; color: var(--gold); font-weight: 700; }
+    .pending-chip {
+      background: var(--gold) !important; color: white !important;
+      border-color: var(--gold) !important;
+      cursor: grab; touch-action: none;
+    }
+    .pending-cancel {
+      font-size: .75rem; color: var(--text-light); cursor: pointer;
+      padding: .1rem .4rem; border-radius: 999px; background: rgba(0,0,0,.06);
+    }
+
+    /* Pool chip remove button — 加大觸控範圍，獨立處理避免被拖曳事件吃掉 */
+    .pool-chip-remove {
+      display: inline-flex; align-items: center; justify-content: center;
+      margin-left: .25rem; font-size: .75rem; font-weight: 700;
+      color: rgba(196,134,10,.55); cursor: pointer;
+      width: 1.3rem; height: 1.3rem;
+      border-radius: 50%; background: rgba(196,134,10,.08);
+      vertical-align: middle; line-height: 1;
+      transition: background .15s, color .15s;
+    }
+    .pool-chip-remove:active { background: #FEE2E2; color: var(--danger); }
+
+    /* 手動輸入姓名（其他人員） */
+    .other-name-row {
+      display: flex; align-items: center; gap: .4rem; width: 100%;
+    }
+    .other-name-input {
+      flex: 1; padding: .5rem .75rem; border: 1.5px solid var(--border);
+      border-radius: .625rem; font-size: .88rem; outline: none;
+      background: white; min-width: 0;
+    }
+    .other-name-input:focus { border-color: var(--primary-light); }
+    .other-name-confirm {
+      padding: .5rem .9rem; background: var(--primary); color: white;
+      border: none; border-radius: .625rem; font-size: .85rem;
+      font-weight: 700; cursor: pointer; white-space: nowrap;
+    }
+
+    /* Drag ghost */
+    .drag-ghost {
+      position: fixed; z-index: 9999; pointer-events: none;
+      background: var(--primary); color: white; padding: .32rem .85rem;
+      border-radius: 999px; font-size: .88rem; font-weight: 700;
+      box-shadow: 0 6px 20px rgba(196,134,10,.45); opacity: .93;
+      white-space: nowrap; transform: scale(1.1); will-change: left, top;
+    }
+
+    /* ===== SHAKE ===== */
+    @keyframes shake {
+      0%,100%{transform:translateX(0)} 15%{transform:translateX(-8px)} 30%{transform:translateX(8px)}
+      45%{transform:translateX(-5px)} 60%{transform:translateX(5px)} 75%{transform:translateX(-3px)} 90%{transform:translateX(3px)}
+    }
+  </style>
+</head>
+<body>
+
+<!-- ===== Loading ===== -->
+<div class="loading-overlay" id="loading">
+  <div class="loading-card">
+    <div class="spinner"></div>
+    <div class="loading-text">處理中...</div>
+  </div>
+</div>
+
+<!-- ===== Toast ===== -->
+<div class="toast" id="toast"></div>
+
+<!-- ===== STAFF PICKER MODAL ===== -->
+<div class="modal-overlay hidden" id="staff-picker-modal">
+  <div class="modal-sheet">
+    <div class="modal-header">
+      <div class="modal-title">👥 選擇出勤人員</div>
+      <button class="modal-close" onclick="closeStaffPicker()">✕ 完成</button>
+    </div>
+    <div class="conflict-notice" id="conflict-notice">⚠️ 灰色人員已被同時段其他場次佔用（同日期+宴會類型）</div>
+    <div class="modal-scroll">
+      <div class="staff-options-grid" id="staff-options-grid"></div>
+      <div class="other-input-row" id="other-input-row">
+        <input type="text" id="other-staff-name" placeholder="輸入人名，按加入" onkeydown="if(event.key==='Enter')addOtherStaff()">
+        <button class="other-add-btn" onclick="addOtherStaff()">加入</button>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <div class="selected-count" id="selected-count">已選擇 0 人</div>
+      <button class="modal-confirm-btn" onclick="closeStaffPicker()">✅ 確認</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== STAFF WARNING MODAL ===== -->
+<div class="modal-overlay hidden center" id="staff-warning-modal">
+  <div class="warning-center-box">
+    <span class="warning-icon-big">⚠️</span>
+    <div class="warning-modal-title">人力不足警告</div>
+    <div class="warning-modal-msg" id="warning-modal-msg"></div>
+    <button class="warning-close-btn" onclick="closeWarningModal()">✕ 知道了</button>
+  </div>
+</div>
+
+<!-- ===== COMPARISON MODAL ===== -->
+<div class="modal-overlay hidden" id="comparison-modal">
+  <div class="modal-sheet">
+    <div class="modal-header">
+      <div class="modal-title">📊 同時段人力比較</div>
+      <button class="modal-close" onclick="closeComparisonModal()">✕</button>
+    </div>
+    <div class="modal-scroll" id="comparison-content"></div>
+  </div>
+</div>
+
+<!-- ===== SETUP SCREEN ===== -->
+<div class="screen" id="setup-screen">
+  <div class="setup-top">
+    <span class="logo-emoji">🏠</span>
+    <h1>滿屋設計</h1>
+    <p>場次管理系統 · 首次設定</p>
+  </div>
+  <div class="setup-card">
+    <h3>🔧 API 網址設定</h3>
+    <p class="hint">請先完成 Google Apps Script 部署，再將「網路應用程式 URL」貼入下方欄位</p>
+    <label class="form-label">Google Apps Script URL</label>
+    <textarea class="setup-input" id="api-url-input" placeholder="https://script.google.com/macros/s/AKfycb.../exec" rows="3"></textarea>
+    <button class="setup-btn" onclick="saveSetup()">✅ 儲存並開始使用</button>
+  </div>
+</div>
+
+<!-- ===== LOGIN SCREEN ===== -->
+<div class="screen" id="login-screen">
+  <div class="login-logo">
+    <span class="brand-icon">🏠</span>
+    <h1>滿屋設計</h1>
+    <p>場次管理系統</p>
+  </div>
+  <div class="user-selector" id="user-selector">
+    <div class="user-selector-label">請選擇您的帳號</div>
+    <div class="user-grid">
+      <button class="user-btn" ontouchstart="event.preventDefault();selectUser('Kevin')" onclick="selectUser('Kevin')">Kevin</button>
+      <button class="user-btn" ontouchstart="event.preventDefault();selectUser('Lulu')" onclick="selectUser('Lulu')">Lulu</button>
+      <button class="user-btn" ontouchstart="event.preventDefault();selectUser('Pei-ying')" onclick="selectUser('Pei-ying')">Pei-ying</button>
+      <button class="user-btn" ontouchstart="event.preventDefault();selectUser('Sherry')" onclick="selectUser('Sherry')">Sherry</button>
+      <button class="user-btn" ontouchstart="event.preventDefault();selectUser('之曦')" onclick="selectUser('之曦')">之曦</button>
+      <button class="user-btn" ontouchstart="event.preventDefault();selectUser('Kid')" onclick="selectUser('Kid')">Kid</button>
+    </div>
+  </div>
+  <div class="pin-section" id="pin-section" style="display:none">
+    <div class="user-greeting" id="user-greeting">👋 請輸入驗證碼</div>
+    <div class="pin-error" id="pin-error"></div>
+    <div class="pin-display" id="pin-display">
+      <div class="pin-dot" id="dot-0"></div><div class="pin-dot" id="dot-1"></div>
+      <div class="pin-dot" id="dot-2"></div><div class="pin-dot" id="dot-3"></div>
+      <div class="pin-dot" id="dot-4"></div><div class="pin-dot" id="dot-5"></div>
+    </div>
+    <div class="pin-label">請輸入 6 位驗證碼</div>
+    <div class="keypad">
+      <button class="key" ontouchstart="event.preventDefault();keyInput('1')" onclick="keyInput('1')">1</button>
+      <button class="key" ontouchstart="event.preventDefault();keyInput('2')" onclick="keyInput('2')">2<span class="key-sub">ABC</span></button>
+      <button class="key" ontouchstart="event.preventDefault();keyInput('3')" onclick="keyInput('3')">3<span class="key-sub">DEF</span></button>
+      <button class="key" ontouchstart="event.preventDefault();keyInput('4')" onclick="keyInput('4')">4<span class="key-sub">GHI</span></button>
+      <button class="key" ontouchstart="event.preventDefault();keyInput('5')" onclick="keyInput('5')">5<span class="key-sub">JKL</span></button>
+      <button class="key" ontouchstart="event.preventDefault();keyInput('6')" onclick="keyInput('6')">6<span class="key-sub">MNO</span></button>
+      <button class="key" ontouchstart="event.preventDefault();keyInput('7')" onclick="keyInput('7')">7<span class="key-sub">PQRS</span></button>
+      <button class="key" ontouchstart="event.preventDefault();keyInput('8')" onclick="keyInput('8')">8<span class="key-sub">TUV</span></button>
+      <button class="key" ontouchstart="event.preventDefault();keyInput('9')" onclick="keyInput('9')">9<span class="key-sub">WXYZ</span></button>
+      <button class="key empty"></button>
+      <button class="key" ontouchstart="event.preventDefault();keyInput('0')" onclick="keyInput('0')">0</button>
+      <button class="key del" ontouchstart="event.preventDefault();keyDelete()" onclick="keyDelete()">⌫</button>
+    </div>
+    <button class="back-to-user" onclick="backToUserSelect()">← 切換帳號</button>
+  </div>
+  <button class="login-footer-btn" onclick="showSetup()">⚙️ 重新設定 API 網址</button>
+</div>
+
+<!-- ===== MAIN SCREEN ===== -->
+<div class="screen" id="main-screen">
+  <div class="main-header">
+    <div class="main-header-top">
+      <div class="header-brand">🏠 滿屋設計場次</div>
+      <div class="header-actions">
+        <button class="header-btn" onclick="refreshOrders()" title="重新整理">↻</button>
+        <button class="header-btn" onclick="logout()" title="登出">⏏</button>
+      </div>
+    </div>
+    <div class="month-nav">
+      <button class="month-nav-btn" onclick="changeMonth(-1)">‹</button>
+      <div class="month-title" id="month-title">2026年4月</div>
+      <button class="month-nav-btn" onclick="changeMonth(1)">›</button>
+    </div>
+    <div class="stats-bar">
+      <div class="stat-item"><div class="stat-num" id="stat-total">0</div><div class="stat-label">本月場次</div></div>
+      <div class="stat-item"><div class="stat-num" id="stat-wedding">0</div><div class="stat-label">婚禮場</div></div>
+      <div class="stat-item"><div class="stat-num" id="stat-business">0</div><div class="stat-label">商業場</div></div>
+      <div class="stat-item"><div class="stat-num" id="stat-other">0</div><div class="stat-label">其他</div></div>
+      <div class="stat-item"><div class="stat-num" id="stat-leave">0</div><div class="stat-label">人員休</div></div>
+    </div>
+  </div>
+  <div class="filter-tabs">
+    <button class="filter-tab active" data-filter="all"   onclick="setFilter(this)">全部</button>
+    <button class="filter-tab" data-filter="婚禮場" onclick="setFilter(this)">💒 婚禮</button>
+    <button class="filter-tab" data-filter="商業場" onclick="setFilter(this)">🏢 商業</button>
+    <button class="filter-tab" data-filter="其他"   onclick="setFilter(this)">✨ 其他</button>
+    <button class="filter-tab" data-filter="人員休" onclick="setFilter(this)">😴 人員休</button>
+  </div>
+  <div class="orders-list" id="orders-list"></div>
+  <button class="fab" onclick="showAddOrder()" title="新增場次">＋</button>
+</div>
+
+<!-- ===== ADD / EDIT ORDER SCREEN ===== -->
+<div class="screen" id="add-screen">
+  <div class="sub-header">
+    <button class="back-btn" onclick="showMain()">‹</button>
+    <h2 id="form-title">📝 新增場次訂單</h2>
+    <button class="sub-header-action" onclick="submitOrder()">儲存</button>
+  </div>
+  <div class="form-container">
+
+    <div class="form-section">
+      <div class="form-section-title">📅 場次資訊</div>
+      <div class="form-field">
+        <label class="form-label">訂單日期<span class="required">*</span></label>
+        <div class="date-row">
+          <input type="date" class="form-input" id="f-date" style="flex:1" oninput="updateWeekday()">
+          <div class="weekday-badge" id="weekday-badge">－</div>
+        </div>
+      </div>
+      <div class="form-field">
+        <label class="form-label">客戶名稱<span class="required">*</span></label>
+        <input type="text" class="form-input" id="f-client" placeholder="例：陳小姐、王先生">
+      </div>
+      <div class="form-field">
+        <label class="form-label">場次類型<span class="required">*</span></label>
+        <div class="radio-group">
+          <label class="radio-item"><input type="radio" name="eventType" value="婚禮場" checked><span class="radio-label">💒 婚禮場</span></label>
+          <label class="radio-item"><input type="radio" name="eventType" value="商業場"><span class="radio-label">🏢 商業場</span></label>
+          <label class="radio-item"><input type="radio" name="eventType" value="其他"><span class="radio-label">✨ 其他</span></label>
+          <label class="radio-item"><input type="radio" name="eventType" value="人員休"><span class="radio-label">😴 人員休</span></label>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <div class="form-section-title">📍 場地資訊</div>
+      <div class="form-field">
+        <label class="form-label">活動地點</label>
+        <input type="text" class="form-input" id="f-venue" placeholder="例：台北漢來大飯店">
+      </div>
+      <div class="form-field">
+        <label class="form-label">宴會廳別</label>
+        <input type="text" class="form-input" id="f-hall" placeholder="例：鉑金A廳、天翼廳">
+      </div>
+      <div class="form-field">
+        <label class="form-label">宴會類型</label>
+        <div class="radio-group">
+          <label class="radio-item"><input type="radio" name="mealType" value="午宴" checked><span class="radio-label">🌞 午宴</span></label>
+          <label class="radio-item"><input type="radio" name="mealType" value="晚宴"><span class="radio-label">🌙 晚宴</span></label>
+          <label class="radio-item"><input type="radio" name="mealType" value="其他"><span class="radio-label">⭐ 其他</span></label>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <div class="form-section-title">👥 人員安排</div>
+      <div class="form-field">
+        <label class="form-label">PM 名字</label>
+        <input type="text" class="form-input" id="f-pm" placeholder="例：修齊、SH、Kid">
+      </div>
+      <div class="form-field">
+        <label class="form-label">此場次所需人力數量</label>
+        <div class="staff-req-row">
+          <input type="number" class="staff-req-input" id="f-staff-req" min="0" max="99" placeholder="0">
+          <span class="staff-req-label">人（0 = 不設限）</span>
+        </div>
+      </div>
+      <div class="form-field">
+        <label class="form-label">當天出勤人員</label>
+        <button type="button" class="staff-picker-btn" onclick="openStaffPicker()" id="staff-picker-btn">
+          <span id="staff-picker-placeholder">點此選擇出勤人員...</span>
+          <span style="font-size:.85rem">▼</span>
+        </button>
+        <div class="staff-tags-display" id="staff-tags-display"></div>
+        <button type="button" class="comparison-trigger" id="comparison-trigger-form" onclick="showComparisonFromForm()" style="display:none">
+          📊 查看同時段所有場次人力分配
+        </button>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <div class="form-section-title">🎨 佈置款式</div>
+      <div class="form-field">
+        <label class="form-label">款式選擇</label>
+        <select class="deco-select" id="f-deco-style" onchange="onDecoStyleChange()">
+          <option value="">－ 未選擇 －</option>
+          <option value="__custom__">✏️ 全客製佈置：風格請手動輸入</option>
+          <option value="微客製001款">微客製001款</option>
+          <option value="微客製003款">微客製003款</option>
+          <option value="微客製004款">微客製004款</option>
+          <option value="微客製005款">微客製005款</option>
+          <option value="微客製006款">微客製006款</option>
+          <option value="微客製010款">微客製010款</option>
+          <option value="微客製011款">微客製011款</option>
+          <option value="微客製012款">微客製012款</option>
+          <option value="微客製021款">微客製021款</option>
+          <option value="微客製023款">微客製023款</option>
+          <option value="微客製024款">微客製024款</option>
+          <option value="微客製026款">微客製026款</option>
+          <option value="微客製027款">微客製027款</option>
+          <option value="微客製028款">微客製028款</option>
+          <option value="微客製029款">微客製029款</option>
+          <option value="__other__">✏️ 微客製其他款：編號請手動輸入</option>
+        </select>
+        <div id="deco-text-wrap" class="deco-text-input" style="display:none">
+          <input type="text" class="form-input" id="f-deco-text"
+                 placeholder="請輸入風格描述或款式編號...">
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <div class="form-section-title">📋 備註</div>
+      <div class="form-field">
+        <textarea class="form-input" id="f-notes" placeholder="佈置需求、備品、注意事項..." rows="4"></textarea>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ===== DETAIL SCREEN ===== -->
+<div class="screen" id="detail-screen">
+  <div class="sub-header">
+    <button class="back-btn" onclick="showMain()">‹</button>
+    <h2>📋 場次詳情</h2>
+  </div>
+  <div class="detail-body" id="detail-body"></div>
+</div>
+
+<script>
+  // ================================================
+  //   滿屋設計場次管理 APP  v3.0.0
+  // ================================================
+
+  // ---------- Constants ----------
+  const STAFF_LIST = ['Sherry','之曦','仲威','小李','嚕嚕','小夫','Kid','紀寧','小蔡','大郭','阿國'];
+
+  // ---------- State ----------
+  let API_URL        = '';
+  let PASSCODE       = '';
+  let currentPin     = '';
+  let selectedUser   = '';
+  let editingOrderId = null;
+  let currentYear    = new Date().getFullYear();
+  let currentMonth   = new Date().getMonth() + 1;
+  let allOrders      = [];
+  let currentFilter  = 'all';
+  let selectedStaff  = [];   // 目前選中的出勤人員陣列
+  let _poolState     = {};   // 今日待命人力池 { 'YYYY-MM-DD': ['name',...] }，localStorage 持久化
+
+  // ---------- Orders Cache（localStorage） ----------
+  // key 格式：mw_oc_YYYY_M   value：{ ts: epoch, orders: [...] }
+  // TTL：24 小時後標為 stale（仍顯示，但背景優先刷新）
+  // 自動清理：超過 90 天的 key 在寫入時一併刪除
+  const _OC_PREFIX   = 'mw_oc_';
+  const _OC_STALE_MS = 24 * 60 * 60 * 1000;    // 24 小時
+  const _OC_MAX_MS   = 90 * 24 * 60 * 60 * 1000; // 90 天
+
+  function _ocKey(y, m) { return _OC_PREFIX + y + '_' + m; }
+
+  function _saveOrdersCache(y, m, orders) {
+    try {
+      localStorage.setItem(_ocKey(y, m), JSON.stringify({ ts: Date.now(), orders }));
+      _cleanOrdersCache(); // 順手清舊資料
+    } catch(e) { /* localStorage 滿或無痕模式 */ }
+  }
+
+  function _loadOrdersCache(y, m) {
+    try {
+      const raw = localStorage.getItem(_ocKey(y, m));
+      if (!raw) return null;
+      const { ts, orders } = JSON.parse(raw);
+      return { orders, isStale: (Date.now() - ts) > _OC_STALE_MS };
+    } catch(e) { return null; }
+  }
+
+  function _cleanOrdersCache() {
+    try {
+      const cutoff = Date.now() - _OC_MAX_MS;
+      for (let i = localStorage.length - 1; i >= 0; i--) {
+        const key = localStorage.key(i);
+        if (!key || !key.startsWith(_OC_PREFIX)) continue;
+        try {
+          const { ts } = JSON.parse(localStorage.getItem(key));
+          if (ts < cutoff) localStorage.removeItem(key);
+        } catch(e) { localStorage.removeItem(key); }
+      }
+    } catch(e) { /* silent */ }
+  }
+
+  // ---------- Init ----------
+  window.addEventListener('load', () => {
+    API_URL = localStorage.getItem('mw_api_url') || '';
+    _loadPool(); // 還原上次的待命人力池狀態
+    showScreen(API_URL ? 'login-screen' : 'setup-screen');
+  });
+
+  // ---------- Screen ----------
+  function showScreen(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+    window.scrollTo(0, 0);
+  }
+
+  function showMain() {
+    showScreen('main-screen');
+    refreshOrders();
+  }
+
+  function showAddOrder() {
+    editingOrderId = null;
+    document.getElementById('form-title').textContent = '📝 新增場次訂單';
+    clearForm();
+    showScreen('add-screen');
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('f-date').value = today;
+    updateWeekday();
+    updateComparisonTrigger();
+  }
+
+  function showEditOrder(id) {
+    const order = allOrders.find(o => String(o.id) === String(id));
+    if (!order) return;
+    editingOrderId = id;
+    document.getElementById('form-title').textContent = '✏️ 編輯場次訂單';
+    document.getElementById('f-date').value       = order.date || '';
+    document.getElementById('f-client').value     = order.clientName || '';
+    document.getElementById('f-venue').value      = order.venue || '';
+    document.getElementById('f-hall').value       = order.hall || '';
+    document.getElementById('f-pm').value         = order.pmName || '';
+    document.getElementById('f-staff-req').value  = order.staffRequired || '';
+    document.getElementById('f-notes').value      = order.notes || '';
+    _restoreDecoStyle(order.decoStyle || '');
+    // 還原出勤人員
+    selectedStaff = order.staff
+      ? order.staff.split(/\s*\/\s*/).map(s=>s.trim()).filter(Boolean)
+      : [];
+    renderStaffTags();
+    updateWeekday();
+    const et = document.querySelector(`input[name="eventType"][value="${order.eventType}"]`);
+    if (et) et.checked = true;
+    const mt = document.querySelector(`input[name="mealType"][value="${order.mealType}"]`);
+    if (mt) mt.checked = true;
+    updateComparisonTrigger();
+    showScreen('add-screen');
+  }
+
+  function showSetup() {
+    showScreen('setup-screen');
+    document.getElementById('api-url-input').value = API_URL;
+  }
+
+  // ---------- Setup ----------
+  function saveSetup() {
+    const url = document.getElementById('api-url-input').value.trim();
+    if (!url) { showToast('請輸入 API 網址', 'error'); return; }
+    if (!url.includes('script.google.com')) { showToast('網址格式不正確', 'error'); return; }
+    localStorage.setItem('mw_api_url', url);
+    API_URL = url;
+    showToast('設定已儲存', 'success');
+    setTimeout(() => showScreen('login-screen'), 600);
+  }
+
+  // ---------- PIN ----------
+  function keyInput(d) {
+    if (currentPin.length >= 6) return;
+    currentPin += d;
+    updatePinDisplay();
+    if (currentPin.length === 6) setTimeout(verifyPin, 120);
+  }
+  function keyDelete() {
+    currentPin = currentPin.slice(0, -1);
+    updatePinDisplay();
+    document.getElementById('pin-error').textContent = '';
+  }
+  function updatePinDisplay() {
+    for (let i = 0; i < 6; i++)
+      document.getElementById('dot-' + i).classList.toggle('filled', i < currentPin.length);
+  }
+  async function verifyPin() {
+    showLoading(true, '驗證中...');
+    try {
+      const res  = await fetch(API_URL + '?action=verify&code=' + currentPin);
+      const data = await res.json();
+      if (data.success) {
+        PASSCODE = currentPin;
+        currentPin = '';
+        updatePinDisplay();
+        document.getElementById('pin-error').textContent = '';
+        showLoading(false);
+        showScreen('main-screen');
+        updateMonthTitle();
+        await refreshOrders();
+      } else {
+        pinError('驗證碼錯誤，請重試');
+        showLoading(false);
+      }
+    } catch (e) { pinError('連線失敗，請確認網路'); showLoading(false); }
+  }
+
+  // ---------- User Select ----------
+  function selectUser(name) {
+    selectedUser = name;
+    document.getElementById('user-selector').style.display = 'none';
+    document.getElementById('pin-section').style.display   = 'block';
+    document.getElementById('user-greeting').textContent   = '👋 ' + name + '，請輸入驗證碼';
+    currentPin = '';
+    updatePinDisplay();
+    document.getElementById('pin-error').textContent = '';
+  }
+  function backToUserSelect() {
+    currentPin = '';
+    updatePinDisplay();
+    document.getElementById('pin-error').textContent = '';
+    document.getElementById('pin-section').style.display   = 'none';
+    document.getElementById('user-selector').style.display = 'block';
+    selectedUser = '';
+  }
+  function pinError(msg) {
+    document.getElementById('pin-error').textContent = msg;
+    currentPin = '';
+    updatePinDisplay();
+    const el = document.getElementById('pin-display');
+    el.style.animation = 'shake 0.45s ease';
+    setTimeout(() => el.style.animation = '', 450);
+  }
+  function logout() {
+    PASSCODE = ''; currentPin = ''; selectedUser = ''; allOrders = [];
+    updatePinDisplay();
+    showScreen('login-screen');
+    document.getElementById('pin-section').style.display   = 'none';
+    document.getElementById('user-selector').style.display = 'block';
+  }
+
+  // ---------- Orders ----------
+  async function refreshOrders() {
+    const cached = _loadOrdersCache(currentYear, currentMonth);
+
+    if (cached) {
+      // ── 快取命中：瞬間顯示上次資料，背景靜默更新 ──
+      allOrders = cached.orders;
+      renderOrders();
+      _setRefreshSpinner(true);   // 刷新按鈕顯示旋轉
+    } else {
+      // ── 無快取：第一次載入，顯示 loading overlay ──
+      showLoading(true, '載入場次資料...');
+    }
+
+    try {
+      const url = API_URL + '?action=getOrders&code=' + PASSCODE +
+                  '&month=' + currentMonth + '&year=' + currentYear;
+      const res  = await fetch(url);
+      const data = await res.json();
+      if (data.success) {
+        allOrders = data.orders || [];
+        _saveOrdersCache(currentYear, currentMonth, allOrders);
+        renderOrders();
+      } else {
+        // 有快取時靜默失敗，無快取才彈 toast
+        if (!cached) showToast('載入失敗：' + (data.error || '未知錯誤'), 'error');
+      }
+    } catch(e) {
+      if (!cached) showToast('網路連線失敗，請重試', 'error');
+    }
+
+    showLoading(false);
+    _setRefreshSpinner(false);
+  }
+
+  function _setRefreshSpinner(on) {
+    const btn = document.querySelector('.header-btn[onclick="refreshOrders()"]');
+    if (!btn) return;
+    btn.classList.toggle('spinning', on);
+    btn.disabled = on;
+  }
+
+  function renderOrders() {
+    updateMonthTitle();
+    const filtered = currentFilter === 'all'
+      ? allOrders : allOrders.filter(o => o.eventType === currentFilter);
+    filtered.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+    document.getElementById('stat-total').textContent    = allOrders.length;
+    document.getElementById('stat-wedding').textContent  = allOrders.filter(o => o.eventType === '婚禮場').length;
+    document.getElementById('stat-business').textContent = allOrders.filter(o => o.eventType === '商業場').length;
+    document.getElementById('stat-other').textContent    = allOrders.filter(o => o.eventType === '其他').length;
+    document.getElementById('stat-leave').textContent    = allOrders.filter(o => o.eventType === '人員休').length;
+
+    const list = document.getElementById('orders-list');
+    if (filtered.length === 0) {
+      list.innerHTML = `<div class="empty-state"><div class="empty-icon">${currentFilter==='all'?'📋':currentFilter==='婚禮場'?'💒':'🏢'}</div><p>${currentFilter==='all'?'本月尚無場次資料\n點右下角「＋」新增第一筆':'本月無此類型場次'}</p></div>`;
+      return;
+    }
+
+    // ── 依日期分組 ──────────────────────────────────────────
+    const byDate = {};
+    filtered.forEach(o => { if (!byDate[o.date]) byDate[o.date] = []; byDate[o.date].push(o); });
+
+    list.innerHTML = Object.keys(byDate).sort().map(date => {
+      const orders = byDate[date];
+      const dt  = new Date(date + 'T00:00:00');
+      const wd  = orders[0].weekday || ['日','一','二','三','四','五','六'][dt.getDay()];
+      const mon = dt.getMonth() + 1;
+      const day = dt.getDate();
+
+      return `
+        <div class="date-group">
+          <div class="date-group-header">${mon}月${day}日（週${wd}）</div>
+          ${_renderStaffSelector(date)}
+          ${_renderPool(date)}
+          ${orders.map(o => _renderCard(o)).join('')}
+        </div>`;
+    }).join('');
+
+    _initDrag(); // 掛載拖曳事件（首次呼叫才掛，之後 no-op）
+  }
+
+  function makeTypeTag(et) {
+    if (et === '婚禮場') return '<span class="tag tag-wedding">💒 婚禮場</span>';
+    if (et === '商業場') return '<span class="tag tag-business">🏢 商業場</span>';
+    if (et === '人員休') return '<span class="tag tag-leave">😴 人員休</span>';
+    return `<span class="tag tag-other">✨ ${esc(et)}</span>`;
+  }
+  function makeMealTag(mt) {
+    if (mt === '午宴') return '<span class="tag tag-lunch">🌞 午宴</span>';
+    if (mt === '晚宴') return '<span class="tag tag-dinner">🌙 晚宴</span>';
+    if (mt)            return `<span class="tag tag-evening">⭐ ${esc(mt)}</span>`;
+    return '';
+  }
+
+  function setFilter(el) {
+    document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
+    el.classList.add('active');
+    currentFilter = el.dataset.filter;
+    renderOrders();
+  }
+
+  function changeMonth(delta) {
+    currentMonth += delta;
+    if (currentMonth > 12) { currentMonth = 1;  currentYear++; }
+    if (currentMonth < 1)  { currentMonth = 12; currentYear--; }
+    allOrders = [];
+    renderOrders();
+    refreshOrders();
+  }
+
+  function updateMonthTitle() {
+    document.getElementById('month-title').textContent = currentYear + '年' + currentMonth + '月';
+  }
+
+  // ---------- Form ----------
+  function updateWeekday() {
+    const v = document.getElementById('f-date').value;
+    document.getElementById('weekday-badge').textContent = v
+      ? '週' + ['日','一','二','三','四','五','六'][new Date(v + 'T00:00:00').getDay()]
+      : '－';
+    updateComparisonTrigger();
+  }
+
+  // 當日期或宴會類型改變時，判斷是否要顯示「同時段比較」按鈕
+  function updateComparisonTrigger() {
+    const date     = document.getElementById('f-date').value;
+    const mealType = document.querySelector('input[name="mealType"]:checked')?.value;
+    const btn      = document.getElementById('comparison-trigger-form');
+    if (!btn) return;
+    const sameSlot = allOrders.filter(o =>
+      o.date === date && o.mealType === mealType && mealType !== '其他' &&
+      String(o.id) !== String(editingOrderId)
+    );
+    btn.style.display = (date && sameSlot.length > 0) ? 'flex' : 'none';
+    if (date && sameSlot.length > 0)
+      btn.textContent = `📊 查看同時段 ${sameSlot.length + 1} 場次人力分配`;
+  }
+
+  // 讓 radio 改變時也更新
+  document.querySelectorAll('input[name="mealType"]').forEach(r => r.addEventListener('change', () => {
+    updateComparisonTrigger();
+    if (document.getElementById('staff-picker-modal') &&
+        !document.getElementById('staff-picker-modal').classList.contains('hidden')) {
+      openStaffPicker(); // 重新整理 picker 衝突狀態
+    }
+  }));
+
+  async function submitOrder() {
+    const date          = document.getElementById('f-date').value;
+    const client        = document.getElementById('f-client').value.trim();
+    const eventType     = document.querySelector('input[name="eventType"]:checked').value;
+    const venue         = document.getElementById('f-venue').value.trim();
+    const hall          = document.getElementById('f-hall').value.trim();
+    const mealType      = document.querySelector('input[name="mealType"]:checked').value;
+    const pm            = document.getElementById('f-pm').value.trim();
+    const staffRequired = document.getElementById('f-staff-req').value.trim();
+    const staff         = selectedStaff.join(' / ');
+    const notes         = document.getElementById('f-notes').value.trim();
+
+    if (!date)   { showToast('請選擇訂單日期', 'error'); return; }
+    if (!client && eventType !== '人員休') { showToast('請輸入客戶名稱', 'error'); return; }
+
+    // 人力不足提示（提交前再提示一次，但不阻擋）
+    const req = parseInt(staffRequired) || 0;
+    if (req > 0 && selectedStaff.length < req) {
+      if (!confirm(`⚠️ 注意：此場次設定需要 ${req} 人，目前只選了 ${selectedStaff.length} 人。\n確定要繼續儲存嗎？`)) return;
+    }
+
+    const isEditing = !!editingOrderId;
+    showLoading(true, isEditing ? '更新訂單中...' : '新增訂單中...');
+    try {
+      const decoStyle    = _getDecoStyleValue();
+      const orderPayload = { date, clientName: client, eventType, venue, hall, mealType, pmName: pm, staff, staffRequired, notes, decoStyle };
+      const body = isEditing
+        ? { action: 'updateOrder', code: PASSCODE, user: selectedUser, id: editingOrderId, order: orderPayload }
+        : { action: 'addOrder',   code: PASSCODE, user: selectedUser, order: orderPayload };
+      const res  = await fetch(API_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body:JSON.stringify(body) });
+      const data = await res.json();
+      if (data.success) {
+        showToast(isEditing ? '✅ 訂單已更新！' : '✅ 場次訂單新增成功！', 'success');
+        editingOrderId = null;
+        clearForm();
+        showMain();
+      } else {
+        showToast((isEditing?'更新':'新增') + '失敗：' + (data.error || '請重試'), 'error');
+      }
+    } catch (e) { showToast('連線失敗，請稍後再試', 'error'); }
+    showLoading(false);
+  }
+
+  // ---------- Deco Style ----------
+  function onDecoStyleChange() {
+    const sel  = document.getElementById('f-deco-style');
+    const wrap = document.getElementById('deco-text-wrap');
+    const inp  = document.getElementById('f-deco-text');
+    const isCustom = sel.value === '__custom__' || sel.value === '__other__';
+    wrap.style.display = isCustom ? 'block' : 'none';
+    if (!isCustom) inp.value = '';
+    if (isCustom) {
+      inp.placeholder = sel.value === '__custom__'
+        ? '請輸入佈置風格描述（例：玫瑰花牆、浮空氣球...）'
+        : '請輸入微客製款式編號（例：030）';
+      setTimeout(() => inp.focus(), 50);
+    }
+  }
+
+  // 取得佈置款式最終儲存值
+  function _getDecoStyleValue() {
+    const sel = document.getElementById('f-deco-style').value;
+    const txt = document.getElementById('f-deco-text').value.trim();
+    if (sel === '__custom__') return txt ? '全客製佈置：' + txt : '全客製佈置';
+    if (sel === '__other__')  return txt ? '微客製其他款：' + txt : '微客製其他款';
+    return sel;
+  }
+
+  // 將已存的佈置款式值還原到 dropdown + 文字欄
+  function _restoreDecoStyle(val) {
+    const sel  = document.getElementById('f-deco-style');
+    const wrap = document.getElementById('deco-text-wrap');
+    const inp  = document.getElementById('f-deco-text');
+    if (!val) { sel.value = ''; wrap.style.display = 'none'; return; }
+    if (val.startsWith('全客製佈置')) {
+      sel.value = '__custom__';
+      inp.value = val.replace(/^全客製佈置[：:]?/, '').trim();
+      wrap.style.display = 'block';
+    } else if (val.startsWith('微客製其他款')) {
+      sel.value = '__other__';
+      inp.value = val.replace(/^微客製其他款[：:]?/, '').trim();
+      wrap.style.display = 'block';
+    } else {
+      // 嘗試匹配標準選項
+      const opt = Array.from(sel.options).find(o => o.value === val);
+      sel.value = opt ? val : '';
+      wrap.style.display = 'none';
+      inp.value = '';
+    }
+  }
+
+  function clearForm() {
+    document.getElementById('f-client').value    = '';
+    document.getElementById('f-venue').value     = '';
+    document.getElementById('f-hall').value      = '';
+    document.getElementById('f-pm').value        = '';
+    document.getElementById('f-staff-req').value = '';
+    document.getElementById('f-notes').value     = '';
+    _restoreDecoStyle('');
+    document.querySelector('input[name="eventType"][value="婚禮場"]').checked = true;
+    document.querySelector('input[name="mealType"][value="午宴"]').checked    = true;
+    selectedStaff = [];
+    renderStaffTags();
+    document.getElementById('comparison-trigger-form').style.display = 'none';
+  }
+
+  // ---------- Staff Picker ----------
+  function openStaffPicker() {
+    const date     = document.getElementById('f-date').value;
+    const mealType = document.querySelector('input[name="mealType"]:checked')?.value;
+    const conflicted = getConflictedStaff(date, mealType, editingOrderId);
+
+    const notice = document.getElementById('conflict-notice');
+    notice.classList.toggle('show', conflicted.size > 0);
+
+    // 已選中但不在 STAFF_LIST 的自訂人員
+    const customSelected = selectedStaff.filter(n => !STAFF_LIST.includes(n));
+    const allNames = [...STAFF_LIST, ...customSelected];
+
+    const grid = document.getElementById('staff-options-grid');
+    grid.innerHTML = allNames.map(name => {
+      const isSelected  = selectedStaff.includes(name);
+      const isConflict  = conflicted.has(name);
+      const cls = isConflict ? 'conflicted' : isSelected ? 'selected' : '';
+      return `<button class="staff-chip ${cls}" onclick="toggleStaff('${esc(name)}')" ${isConflict ? 'disabled title="此人員同時段已有其他場次"' : ''}>${esc(name)}</button>`;
+    }).join('') +
+    `<button class="staff-chip other-btn" id="other-chip-btn" onclick="toggleOtherInput()">＋ 其他人員</button>`;
+
+    updateSelectedCount();
+    document.getElementById('staff-picker-modal').classList.remove('hidden');
+  }
+
+  function closeStaffPicker() {
+    document.getElementById('staff-picker-modal').classList.add('hidden');
+    document.getElementById('other-input-row').classList.remove('show');
+    const btn = document.getElementById('other-chip-btn');
+    if (btn) btn.classList.remove('open');
+    renderStaffTags();
+    updateComparisonTrigger();
+  }
+
+  function toggleStaff(name) {
+    const idx = selectedStaff.indexOf(name);
+    if (idx === -1) selectedStaff.push(name);
+    else            selectedStaff.splice(idx, 1);
+    // 更新這顆 chip 狀態
+    const chips = document.getElementById('staff-options-grid').querySelectorAll('.staff-chip:not(.other-btn)');
+    const date = document.getElementById('f-date').value;
+    const mealType = document.querySelector('input[name="mealType"]:checked')?.value;
+    const conflicted = getConflictedStaff(date, mealType, editingOrderId);
+    const allNames = [...STAFF_LIST, ...selectedStaff.filter(n => !STAFF_LIST.includes(n))];
+    chips.forEach((chip, i) => {
+      const n = allNames[i];
+      if (!n) return;
+      chip.className = 'staff-chip ' + (conflicted.has(n) ? 'conflicted' : selectedStaff.includes(n) ? 'selected' : '');
+    });
+    updateSelectedCount();
+  }
+
+  function toggleOtherInput() {
+    const row = document.getElementById('other-input-row');
+    const btn = document.getElementById('other-chip-btn');
+    row.classList.toggle('show');
+    if (btn) btn.classList.toggle('open', row.classList.contains('show'));
+    if (row.classList.contains('show')) document.getElementById('other-staff-name').focus();
+  }
+
+  function addOtherStaff() {
+    const input = document.getElementById('other-staff-name');
+    const name  = input.value.trim();
+    if (!name) { showToast('請輸入人名', 'warning'); return; }
+    if (!selectedStaff.includes(name)) {
+      selectedStaff.push(name);
+      showToast(name + ' 已加入', 'success');
+    }
+    input.value = '';
+    // 重新整理 picker 以顯示新加的人
+    openStaffPicker();
+  }
+
+  function removeStaff(name) {
+    selectedStaff = selectedStaff.filter(n => n !== name);
+    renderStaffTags();
+    updateComparisonTrigger();
+  }
+
+  function renderStaffTags() {
+    const display = document.getElementById('staff-tags-display');
+    const btn     = document.getElementById('staff-picker-placeholder');
+    if (!display) return;
+    if (selectedStaff.length === 0) {
+      display.innerHTML = '<span style="font-size:.8rem;color:var(--text-light)">尚未選擇人員</span>';
+      if (btn) btn.textContent = '點此選擇出勤人員...';
+    } else {
+      if (btn) btn.textContent = `已選 ${selectedStaff.length} 人`;
+      display.innerHTML = selectedStaff.map(name =>
+        `<span class="staff-tag">${esc(name)}<span class="staff-tag-remove" onclick="removeStaff('${esc(name)}')">✕</span></span>`
+      ).join('');
+    }
+  }
+
+  function updateSelectedCount() {
+    const el = document.getElementById('selected-count');
+    if (el) el.textContent = `已選擇 ${selectedStaff.length} 人`;
+  }
+
+  // ---------- Conflict Detection ----------
+  function getConflictedStaff(date, mealType, currentId) {
+    const conflicted = new Set();
+    if (!date || !mealType || mealType === '其他') return conflicted;
+    allOrders.forEach(order => {
+      if (String(order.id) === String(currentId)) return;
+      if (order.date !== date || order.mealType !== mealType) return;
+      parseStaffNames(order.staff).forEach(n => conflicted.add(n));
+    });
+    return conflicted;
+  }
+
+  function parseStaffNames(staffStr) {
+    if (!staffStr) return [];
+    return staffStr.split(/[\/,、\n]/).map(s => s.trim()).filter(Boolean);
+  }
+
+  // ---------- Staff Warning ----------
+  function checkStaffWarning(order) {
+    const req   = parseInt(order.staffRequired) || 0;
+    if (req <= 0) return;
+    const names = parseStaffNames(order.staff);
+    if (names.length < req) {
+      const lack = req - names.length;
+      document.getElementById('warning-modal-msg').textContent =
+        `此場次需要 ${req} 名執行人力\n目前已安排：${names.length} 人（${order.staff || '尚未填寫'}）\n\n還差 ${lack} 人未到位！\n請盡快補足人力安排。`;
+      document.getElementById('staff-warning-modal').classList.remove('hidden');
+    }
+  }
+
+  function closeWarningModal() {
+    document.getElementById('staff-warning-modal').classList.add('hidden');
+  }
+
+  // ---------- Comparison Modal ----------
+  function showComparisonFromForm() {
+    const date     = document.getElementById('f-date').value;
+    const mealType = document.querySelector('input[name="mealType"]:checked')?.value;
+    showComparisonModal(date, mealType, editingOrderId);
+  }
+
+  function showComparisonModal(date, mealType, excludeId) {
+    const sameSlot = allOrders.filter(o =>
+      o.date === date && o.mealType === mealType && String(o.id) !== String(excludeId)
+    );
+    // 如果是從詳情頁呼叫，包含自身
+    const targetOrders = allOrders.filter(o => o.date === date && o.mealType === mealType);
+
+    if (targetOrders.length === 0) { showToast('此時段無場次資料', 'warning'); return; }
+
+    const allUsedStaff = new Set();
+    targetOrders.forEach(o => parseStaffNames(o.staff).forEach(n => allUsedStaff.add(n)));
+    const availableStaff = STAFF_LIST.filter(n => !allUsedStaff.has(n));
+
+    const content = document.getElementById('comparison-content');
+    content.innerHTML =
+      `<div style="padding:.625rem .875rem;font-size:.82rem;color:var(--text-mid);border-bottom:1px solid var(--border)">
+        📅 ${date} ・ ${mealType} ・ 共 ${targetOrders.length} 場次
+       </div>` +
+      targetOrders.map(o => {
+        const names = parseStaffNames(o.staff);
+        const req   = parseInt(o.staffRequired) || 0;
+        const short = req > 0 && names.length < req;
+        return `
+          <div class="comparison-order-block">
+            <div class="comparison-order-header">${esc(o.clientName) || '(未填)'} · ${esc(o.eventType)}</div>
+            <div class="comparison-order-sub">${esc(o.venue)}${o.hall?' · '+esc(o.hall):''}</div>
+            <div class="comparison-chips">
+              ${names.length > 0
+                ? names.map(n=>`<span class="comparison-chip">${esc(n)}</span>`).join('')
+                : '<span style="font-size:.8rem;color:var(--text-light)">尚未安排人員</span>'}
+            </div>
+            ${req > 0 ? `<span class="comparison-summary-bar ${short?'warn':''}">
+              需 ${req} 人 · 已排 ${names.length} 人 ${short ? '· ⚠️ 缺 '+(req-names.length)+' 人' : '· ✅ 充足'}
+            </span>` : ''}
+          </div>`;
+      }).join('') +
+      `<div class="available-staff-block">
+        <div class="available-title">💤 本時段待命人員（${availableStaff.length} 人）</div>
+        <div class="comparison-chips">
+          ${availableStaff.length > 0
+            ? availableStaff.map(n=>`<span class="comparison-chip" style="background:#10B981">${n}</span>`).join('')
+            : '<span style="font-size:.8rem;color:var(--text-mid)">全員已排入場次</span>'}
+        </div>
+       </div>`;
+
+    document.getElementById('comparison-modal').classList.remove('hidden');
+  }
+
+  function closeComparisonModal() {
+    document.getElementById('comparison-modal').classList.add('hidden');
+  }
+
+  // ---------- Detail ----------
+  function showDetail(id) {
+    const order = allOrders.find(o => String(o.id) === String(id));
+    if (!order) return;
+
+    const dt  = new Date(order.date + 'T00:00:00');
+    const wd  = order.weekday || ['日','一','二','三','四','五','六'][dt.getDay()];
+    const typeTag = makeTypeTag(order.eventType);
+    const mealTag = makeMealTag(order.mealType);
+
+    // 人力狀態 badge
+    const req   = parseInt(order.staffRequired) || 0;
+    const names = parseStaffNames(order.staff);
+    let staffBadge = '';
+    if (req > 0) {
+      const ok = names.length >= req;
+      staffBadge = `<div class="staff-count-badge ${ok?'ok':'warn'}">
+        ${ok ? '✅' : '⚠️'} 人力 ${names.length} / ${req} 人${ok ? ' 充足' : ' 不足'}
+      </div>`;
+    } else if (order.staffRequired === '' || order.staffRequired === '0' || !order.staffRequired) {
+      staffBadge = '';
+    }
+
+    // 同時段比較按鈕（只在有宴會類型且同時段有其他場次時出現）
+    const sameSlot = allOrders.filter(o => o.date === order.date && o.mealType === order.mealType && o.mealType !== '其他');
+    const compBtn  = sameSlot.length > 1
+      ? `<button class="comparison-trigger" onclick="showComparisonModal('${esc(order.date)}','${esc(order.mealType)}',null)" style="margin:.5rem 0">
+           📊 同時段共 ${sameSlot.length} 場 · 查看人力比較
+         </button>` : '';
+
+    document.getElementById('detail-body').innerHTML = `
+      <div class="detail-section">
+        <div class="detail-section-title">📅 場次資訊</div>
+        <div class="detail-row">
+          <span class="detail-label">訂單日期</span>
+          <span class="detail-value">${esc(order.date)}（週${wd}）</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">客戶名稱</span>
+          <span class="detail-value">${esc(order.clientName) || '－'}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">場次類型</span>
+          <div class="detail-value"><div class="detail-tags">${typeTag}${mealTag}</div></div>
+        </div>
+      </div>
+      <div class="detail-section">
+        <div class="detail-section-title">📍 場地資訊</div>
+        <div class="detail-row">
+          <span class="detail-label">活動地點</span>
+          <span class="detail-value">${esc(order.venue) || '－'}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">宴會廳別</span>
+          <span class="detail-value">${esc(order.hall) || '－'}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">佈置款式</span>
+          <span class="detail-value">${order.decoStyle
+            ? `<span style="background:#FFF8DC;color:#8B5E00;padding:.2rem .7rem;border-radius:999px;font-size:.82rem;font-weight:600">${esc(order.decoStyle)}</span>`
+            : '－'}</span>
+        </div>
+      </div>
+      <div class="detail-section">
+        <div class="detail-section-title">👥 人員安排</div>
+        <div class="detail-row">
+          <span class="detail-label">PM</span>
+          <span class="detail-value">${esc(order.pmName) || '－'}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">所需人力</span>
+          <span class="detail-value">${req > 0 ? req + ' 人' : '未設定'}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">出勤人員</span>
+          <div class="detail-value">
+            ${names.length > 0
+              ? names.map(n=>`
+                  <span class="detail-staff-chip">
+                    ${esc(n)}
+                    <span class="detail-staff-remove"
+                          onclick="removeFromOrder(event,'${esc(String(order.id))}','${esc(n)}')"
+                          title="取消 ${esc(n)} 出勤">✕</span>
+                  </span>`).join('')
+              : '－'}
+            ${staffBadge}
+          </div>
+        </div>
+        ${compBtn}
+      </div>
+      ${order.notes ? `
+      <div class="detail-section">
+        <div class="detail-section-title">📋 備註</div>
+        <div class="detail-row" style="flex-direction:column;gap:.5rem;">
+          <span class="detail-value" style="white-space:pre-wrap">${esc(order.notes)}</span>
+        </div>
+      </div>` : ''}
+      <div class="created-at">建立時間：${esc(order.createdAt) || '－'}</div>
+      <button class="edit-btn" onclick="showEditOrder('${esc(id)}')">✏️ 編輯此場次訂單</button>
+      <button class="delete-btn" onclick="confirmDelete('${esc(id)}')">🗑️ 刪除此場次訂單</button>
+      <div id="history-block" class="history-section" style="display:none">
+        <div class="history-title">📋 修改歷史紀錄</div>
+        <div id="history-list"><span style="font-size:.8rem;color:var(--text-light)">載入中...</span></div>
+      </div>
+    `;
+
+    showScreen('detail-screen');
+    loadHistory(id);
+    // 延遲一點再跳警告，讓畫面先渲染完
+    setTimeout(() => checkStaffWarning(order), 400);
+  }
+
+  async function loadHistory(id) {
+    try {
+      const res  = await fetch(`${API_URL}?action=getHistory&code=${PASSCODE}&id=${encodeURIComponent(id)}`);
+      const data = await res.json();
+      const block = document.getElementById('history-block');
+      const list  = document.getElementById('history-list');
+      if (!data.success || !data.history || data.history.length === 0) return;
+      block.style.display = 'block';
+      list.innerHTML = data.history.map(h => {
+        const cls = h.action === '新增' ? 'add' : h.action === '刪除' ? 'delete' : 'edit';
+        return `<div class="history-item">
+          <div class="history-meta">
+            <span class="history-user">👤 ${esc(h.user)}</span>
+            <span class="history-time">${esc(h.time)}</span>
+          </div>
+          <span class="history-action ${cls}">${esc(h.action)}</span>
+          <div class="history-detail">${esc(h.details)}</div>
+        </div>`;
+      }).join('');
+    } catch(e) { /* silent */ }
+  }
+
+  async function confirmDelete(id) {
+    if (!confirm('確定要刪除此場次訂單嗎？\n刪除後無法復原')) return;
+    showLoading(true, '刪除中...');
+    try {
+      const res  = await fetch(API_URL, { method:'POST', headers:{'Content-Type':'text/plain'},
+        body: JSON.stringify({ action:'deleteOrder', code:PASSCODE, user:selectedUser, id }) });
+      const data = await res.json();
+      if (data.success) { showToast('場次已刪除', 'success'); showMain(); }
+      else showToast('刪除失敗：' + (data.error || ''), 'error');
+    } catch (e) { showToast('連線失敗', 'error'); }
+    showLoading(false);
+  }
+
+  // ---------- Utils ----------
+  function showLoading(show, text) {
+    const el = document.getElementById('loading');
+    el.classList.toggle('active', show);
+    if (text) el.querySelector('.loading-text').textContent = text;
+  }
+
+  function showToast(msg, type) {
+    const toast = document.getElementById('toast');
+    toast.textContent = msg;
+    toast.className = 'toast' + (type ? ' ' + type : '');
+    toast.classList.add('show');
+    clearTimeout(window._toastTimer);
+    window._toastTimer = setTimeout(() => toast.classList.remove('show'), 3000);
+  }
+
+  function esc(str) {
+    if (!str) return '';
+    return String(str)
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  // =====================================================
+  //   待命人力池 & 拖曳指派系統
+  // =====================================================
+
+  // ── 待命人力池 localStorage 狀態管理 ──────────────────────
+  function _loadPool() {
+    try { _poolState = JSON.parse(localStorage.getItem('mw_pool') || '{}'); }
+    catch(e) { _poolState = {}; }
+  }
+  function _savePool() {
+    localStorage.setItem('mw_pool', JSON.stringify(_poolState));
+  }
+
+  /**
+   * 渲染「選擇人員」下拉選單 + pending chip 暫放區
+   * 下拉選單只列出「不在池中」且「不在今天任何訂單中」的人員
+   */
+  function _renderStaffSelector(date) {
+    const taken = new Set();
+    (_poolState[date] || []).forEach(n => taken.add(n));
+    allOrders.forEach(o => {
+      if (o.date === date) parseStaffNames(o.staff).forEach(n => taken.add(n));
+    });
+    const available = STAFF_LIST.filter(n => !taken.has(n));
+    const options = available.length > 0
+      ? available.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('')
+      : '';
+
+    return `
+      <div class="staff-selector-bar">
+        <select class="staff-add-dropdown"
+                id="sel-${esc(date)}"
+                onchange="onStaffSelect(this,'${esc(date)}')">
+          <option value="">＋ 選擇人員加入今日名單</option>
+          ${options}
+          <option value="__other__">✏️ 其他：請手動輸入人名</option>
+        </select>
+        <div class="pending-chip-area" id="pending-${esc(date)}"></div>
+      </div>`;
+  }
+
+  /** 下拉選單選完後，顯示待拖曳的 pending chip（或手動輸入框） */
+  function onStaffSelect(sel, date) {
+    const name = sel.value;
+    if (!name) return;
+    sel.value = ''; // 重設選單
+    const area = document.getElementById('pending-' + date);
+    if (!area) return;
+
+    if (name === '__other__') {
+      // 顯示手動輸入框
+      area.innerHTML = `
+        <div class="other-name-row">
+          <input type="text" class="other-name-input"
+                 id="other-input-${esc(date)}"
+                 placeholder="請輸入姓名…"
+                 onkeydown="if(event.key==='Enter')confirmOtherName('${esc(date)}')">
+          <button class="other-name-confirm" onclick="confirmOtherName('${esc(date)}')">確認</button>
+          <span class="pending-cancel" onclick="cancelPending('${esc(date)}')">✕</span>
+        </div>`;
+      setTimeout(() => document.getElementById('other-input-' + date)?.focus(), 80);
+      return;
+    }
+
+    // 一般人員 → 顯示 pending chip
+    _showPendingChip(area, name, date);
+  }
+
+  /** 手動輸入確認後轉為 pending chip */
+  function confirmOtherName(date) {
+    const input = document.getElementById('other-input-' + date);
+    if (!input) return;
+    const name = input.value.trim();
+    if (!name) { input.focus(); showToast('請輸入姓名', 'warning'); return; }
+    const area = document.getElementById('pending-' + date);
+    if (!area) return;
+    _showPendingChip(area, name, date);
+  }
+
+  /** 渲染 pending chip（選完人員後的暫放狀態） */
+  function _showPendingChip(area, name, date) {
+    area.innerHTML = `
+      <span class="pending-hint">👆 拖曳至待命區或場次</span>
+      <span class="pool-chip pending-chip"
+            data-name="${esc(name)}"
+            data-date="${esc(date)}"
+            data-is-pending="1">${esc(name)}</span>
+      <span class="pending-cancel" onclick="cancelPending('${esc(date)}')">✕ 取消</span>`;
+  }
+
+  /** 取消 pending chip */
+  function cancelPending(date) {
+    const area = document.getElementById('pending-' + date);
+    if (area) area.innerHTML = '';
+  }
+
+  /**
+   * 渲染今日待命人力池（預設空白，由 PM 手動加入）
+   * data-drop-target="pool" 讓 chip 可以拖進來
+   */
+  function _renderPool(date) {
+    const pool = _poolState[date] || [];
+    // 排除已被指派到訂單的人（避免重複顯示）
+    const inOrders = new Set();
+    allOrders.forEach(o => {
+      if (o.date === date) parseStaffNames(o.staff).forEach(n => inOrders.add(n));
+    });
+    const visible = pool.filter(n => !inOrders.has(n));
+
+    const chips = visible.length > 0
+      ? visible.map(n => `
+          <span class="pool-chip"
+                data-name="${esc(n)}"
+                data-date="${esc(date)}">${esc(n)}<span class="pool-chip-remove"
+                onclick="removeFromPool(event,'${esc(date)}','${esc(n)}')"
+                ontouchend="removeFromPool(event,'${esc(date)}','${esc(n)}')">✕</span></span>`
+        ).join('')
+      : `<span class="pool-empty-text">${pool.length > 0 ? '所有待命人員已排入場次' : '請從上方選單加入今日人員'}</span>`;
+
+    return `
+      <div class="staff-pool-panel"
+           data-drop-target="pool"
+           data-date="${esc(date)}">
+        <div class="pool-panel-label">💤 今日待命人力（${visible.length} 人）</div>
+        <div class="pool-chips-row">${chips}</div>
+      </div>`;
+  }
+
+  /** 從場次訂單移除人員（✕ 按鈕）— 樂觀更新版 */
+  async function removeFromOrder(e, orderId, name) {
+    e.stopPropagation();
+    e.preventDefault();
+    const order = allOrders.find(o => String(o.id) === String(orderId));
+    if (!order) return;
+
+    // 快照供還原
+    const oldStaff = order.staff;
+    const date = order.date;
+    const snapPool = JSON.parse(JSON.stringify(_poolState));
+
+    // 即時更新本地狀態
+    order.staff = parseStaffNames(order.staff).filter(n => n !== name).join(' / ');
+    if (!_poolState[date]) _poolState[date] = [];
+    if (!_poolState[date].includes(name)) _poolState[date].push(name);
+    _savePool();
+    renderOrders(); // 立刻反應，不等 API
+
+    // 背景送 API
+    try {
+      if (!await _patchStaff(orderId, order, order.staff)) throw new Error();
+      showToast(`✅ ${name} 已取消出勤，移回待命`, 'success');
+    } catch(err) {
+      // 還原
+      order.staff = oldStaff;
+      Object.assign(_poolState, snapPool);
+      _savePool();
+      renderOrders();
+      showToast('⚠️ 操作失敗，已自動還原', 'error');
+    }
+  }
+
+  /** 手動從池中移除（✕ 按鈕）— 同時支援 click 與 touchend */
+  function removeFromPool(e, date, name) {
+    e.stopPropagation();
+    e.preventDefault();
+    if (_poolState[date]) {
+      _poolState[date] = _poolState[date].filter(n => n !== name);
+      _savePool();
+      renderOrders();
+      showToast(`${name} 已從待命名單移除`, 'success');
+    }
+  }
+
+  /** 渲染單張訂單卡片（含可拖曳的人員 chip 與 drop zone） */
+  function _renderCard(order) {
+    const dt  = new Date(order.date + 'T00:00:00');
+    const day = dt.getDate();
+    const mon = dt.getMonth() + 1;
+    const wd  = order.weekday || ['日','一','二','三','四','五','六'][dt.getDay()];
+    const cardClass = order.eventType === '婚禮場' ? 'wedding'
+                    : order.eventType === '商業場' ? 'business'
+                    : order.eventType === '人員休'  ? 'leave' : 'other';
+    const typeTag = makeTypeTag(order.eventType);
+    const mealTag = makeMealTag(order.mealType);
+    const req    = parseInt(order.staffRequired) || 0;
+    const names  = parseStaffNames(order.staff);
+    const warnBadge = req > 0 && names.length < req
+      ? `<span class="tag" style="background:#FEE2E2;color:var(--danger)">⚠️ ${names.length}/${req}</span>` : '';
+
+    // 人員 chips（純拖曳；取消出勤請拖回待命池或至詳情頁編輯，避免列表頁誤觸）
+    const staffChips = names.length > 0
+      ? names.map(n =>
+          `<span class="card-staff-chip"
+                 data-name="${esc(n)}"
+                 data-source-order="${esc(String(order.id))}">${esc(n)}</span>`
+        ).join('')
+      : `<span class="card-staff-empty">← 拖曳人員至此指派</span>`;
+
+    const sid = esc(String(order.id));
+    return `
+      <div class="order-card ${cardClass}"
+           onclick="showDetail('${sid}')"
+           data-order-id="${sid}">
+        <div class="order-date-badge">
+          <div class="order-date-num">${day}</div>
+          <div class="order-date-day">週${wd}</div>
+          <div class="order-date-month">${mon}月</div>
+        </div>
+        <div class="order-info">
+          <div class="order-client">${esc(order.clientName) || '（未填客戶名稱）'}</div>
+          <div class="order-tags">${typeTag}${mealTag}${warnBadge}</div>
+          <div class="order-venue">${esc([order.venue, order.hall].filter(Boolean).join(' · ')) || '地點未填寫'}</div>
+          ${order.pmName ? `<div class="order-pm">PM：${esc(order.pmName)}</div>` : ''}
+          ${order.decoStyle ? `<div class="order-deco">🎨 ${esc(order.decoStyle)}</div>` : ''}
+          <div class="card-staff-row"
+               data-drop-target="order"
+               data-order-id="${sid}">${staffChips}</div>
+        </div>
+        <div class="order-arrow">›</div>
+      </div>`;
+  }
+
+  // ----- Touch Drag-and-Drop Core -----
+  let _drag = null;
+
+  function _initDrag() {
+    const list = document.getElementById('orders-list');
+    if (list._dragReady) return; // 只綁一次
+    list._dragReady = true;
+    list.addEventListener('touchstart', _onTouchStart, { passive: false });
+    document.addEventListener('touchmove',  _onTouchMove,  { passive: false });
+    document.addEventListener('touchend',   _onTouchEnd,   { passive: false });
+  }
+
+  function _onTouchStart(e) {
+    // 待命池 ✕ 與 pending 取消：不攔截，讓 onclick / ontouchend 正常觸發
+    // （card-staff-remove 已從列表卡片移除，無需排除）
+    if (e.target.closest('.pool-chip-remove, .pending-cancel')) return;
+
+    // 支援：待命池 chip、訂單卡片 chip、pending chip（下拉選完後）
+    const chip = e.target.closest('.pool-chip, .card-staff-chip, .pending-chip');
+    if (!chip) return;
+    e.preventDefault(); // 阻止捲頁；也阻止觸發卡片 onclick
+
+    const touch = e.touches[0];
+    const ghost = document.createElement('div');
+    ghost.className   = 'drag-ghost';
+    ghost.textContent = chip.dataset.name;
+    document.body.appendChild(ghost);
+    ghost.style.left = (touch.clientX - 35) + 'px';
+    ghost.style.top  = (touch.clientY - 16) + 'px';
+    chip.classList.add('drag-source');
+
+    // 找出 chip 對應的日期（pool chip / pending chip 有 data-date；order chip 透過 allOrders 查）
+    const sourceOrderId = chip.dataset.sourceOrder || null;
+    const sourceOrder   = sourceOrderId
+      ? allOrders.find(o => String(o.id) === String(sourceOrderId)) : null;
+    const sourceDate    = chip.dataset.date || (sourceOrder ? sourceOrder.date : null);
+
+    _drag = {
+      name:          chip.dataset.name,
+      sourceOrderId,
+      sourceDate,
+      isPending:     chip.dataset.isPending === '1',
+      ghost,
+      chip
+    };
+  }
+
+  function _onTouchMove(e) {
+    if (!_drag) return;
+    e.preventDefault();
+    const t = e.touches[0];
+    _drag.ghost.style.left = (t.clientX - _drag.ghost.offsetWidth / 2 || t.clientX - 35) + 'px';
+    _drag.ghost.style.top  = (t.clientY - 28) + 'px';
+
+    // 高亮當前 drop target
+    document.querySelectorAll('.drop-active').forEach(el => el.classList.remove('drop-active'));
+    const under = document.elementFromPoint(t.clientX, t.clientY);
+    under?.closest('[data-drop-target]')?.classList.add('drop-active');
+  }
+
+  async function _onTouchEnd(e) {
+    if (!_drag) return;
+    const t = e.changedTouches[0];
+
+    document.querySelectorAll('.drop-active').forEach(el => el.classList.remove('drop-active'));
+    _drag.ghost.remove();
+    _drag.chip.classList.remove('drag-source');
+
+    const under  = document.elementFromPoint(t.clientX, t.clientY);
+    const target = under?.closest('[data-drop-target]');
+    const { name, sourceOrderId, sourceDate, isPending } = _drag;
+    _drag = null;
+
+    if (!target) return;
+
+    const tType    = target.dataset.dropTarget;
+    const tOrderId = target.dataset.orderId || null;
+    const tDate    = target.dataset.date    || sourceDate;
+
+    // ── Pending chip（從下拉選單選出來，還未放到任何地方）──────
+    if (isPending) {
+      if (tType === 'pool') {
+        // → 放入待命池
+        if (!_poolState[tDate]) _poolState[tDate] = [];
+        if (!_poolState[tDate].includes(name)) _poolState[tDate].push(name);
+        _savePool();
+        cancelPending(tDate);
+        renderOrders();
+        showToast(`✅ ${name} 已加入今日待命`, 'success');
+      } else if (tType === 'order') {
+        // → 直接指派到場次（跳過待命池）
+        showLoading(true, '指派人力...');
+        try {
+          const to = allOrders.find(o => String(o.id) === String(tOrderId));
+          if (to) {
+            const ex = parseStaffNames(to.staff);
+            if (!ex.includes(name)) {
+              const ns = [...ex, name].join(' / ');
+              if (await _patchStaff(tOrderId, to, ns)) {
+                to.staff = ns;
+                cancelPending(sourceDate);
+                renderOrders();
+                showToast(`✅ ${name} 已直接指派`, 'success');
+              }
+            } else {
+              showToast(`${name} 已在此場次`, 'warning');
+            }
+          }
+        } catch(err) { showToast('指派失敗', 'error'); }
+        showLoading(false);
+      }
+      return;
+    }
+
+    // ── 一般 pool chip 或 card-staff-chip ──────────────────────
+    if (tType === 'order' && String(tOrderId) === String(sourceOrderId)) return;
+    if (tType === 'pool'  && !sourceOrderId) return; // 已在池中，不重複
+
+    await _doStaffMove(name, sourceOrderId, tType === 'order' ? tOrderId : null, sourceDate, tDate);
+  }
+
+  /**
+   * 執行人員移動（樂觀更新：先更新畫面，再送 API，失敗才還原）
+   * fromOrderId=null → 從待命池出發
+   * toOrderId=null   → 移回待命池
+   */
+  async function _doStaffMove(name, fromOrderId, toOrderId, sourceDate, targetDate) {
+    // ── 記錄還原快照 ─────────────────────────────────────────
+    const snapFrom  = fromOrderId ? { id: fromOrderId, staff: null } : null;
+    const snapTo    = toOrderId   ? { id: toOrderId,   staff: null } : null;
+    const snapPool  = JSON.parse(JSON.stringify(_poolState)); // 深拷貝
+
+    // ── 即時更新本地狀態 ─────────────────────────────────────
+    if (fromOrderId) {
+      const from = allOrders.find(o => String(o.id) === String(fromOrderId));
+      if (from) {
+        snapFrom.staff  = from.staff;
+        from.staff = parseStaffNames(from.staff).filter(n => n !== name).join(' / ');
+        if (!toOrderId && sourceDate) {
+          if (!_poolState[sourceDate]) _poolState[sourceDate] = [];
+          if (!_poolState[sourceDate].includes(name)) _poolState[sourceDate].push(name);
+          _savePool();
+        }
+      }
+    }
+    if (toOrderId) {
+      const pd = targetDate || sourceDate;
+      if (pd && _poolState[pd]) {
+        _poolState[pd] = _poolState[pd].filter(n => n !== name);
+        _savePool();
+      }
+      const to = allOrders.find(o => String(o.id) === String(toOrderId));
+      if (to) {
+        snapTo.staff = to.staff;
+        const ex = parseStaffNames(to.staff);
+        if (!ex.includes(name)) to.staff = [...ex, name].join(' / ');
+      }
+    }
+
+    // ── 立刻渲染（畫面即時反應，不等 API）──────────────────
+    renderOrders();
+    showToast(toOrderId ? `${name} 指派中…` : `${name} 移回中…`, '');
+
+    // ── 背景送出 API ─────────────────────────────────────────
+    try {
+      if (fromOrderId) {
+        const from = allOrders.find(o => String(o.id) === String(fromOrderId));
+        if (from && !await _patchStaff(fromOrderId, from, from.staff))
+          throw new Error('from failed');
+      }
+      if (toOrderId) {
+        const to = allOrders.find(o => String(o.id) === String(toOrderId));
+        if (to && !await _patchStaff(toOrderId, to, to.staff))
+          throw new Error('to failed');
+      }
+      showToast(toOrderId ? `✅ ${name} 已指派` : `✅ ${name} 移回待命`, 'success');
+    } catch (err) {
+      // ── API 失敗 → 還原本地狀態 ─────────────────────────
+      if (snapFrom?.staff !== null) {
+        const from = allOrders.find(o => String(o.id) === String(snapFrom.id));
+        if (from) from.staff = snapFrom.staff;
+      }
+      if (snapTo?.staff !== null) {
+        const to = allOrders.find(o => String(o.id) === String(snapTo.id));
+        if (to) to.staff = snapTo.staff;
+      }
+      Object.assign(_poolState, snapPool);
+      _savePool();
+      renderOrders();
+      showToast('⚠️ 更新失敗，已自動還原', 'error');
+    }
+  }
+
+  /** 呼叫後端 updateOrder 僅更新 staff 欄位 */
+  async function _patchStaff(id, order, newStaff) {
+    const res = await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({
+        action: 'updateOrder', code: PASSCODE, user: selectedUser, id,
+        order: {
+          date: order.date, clientName: order.clientName,
+          eventType: order.eventType, venue: order.venue,
+          hall: order.hall, mealType: order.mealType,
+          pmName: order.pmName, staff: newStaff,
+          staffRequired: order.staffRequired, notes: order.notes,
+          decoStyle: order.decoStyle || ''
+        }
+      })
+    });
+    const d = await res.json();
+    return d.success;
+  }
+</script>
+</body>
+</html>
