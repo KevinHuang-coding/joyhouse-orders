@@ -2372,4 +2372,14 @@
       const data = await res.json();
       if (!data.success) throw new Error(data.error || '刪除失敗');
       showLoading(false);
-      showToast(
+      showToast('✅ 已刪除', 'success');
+      loadExpense();
+    } catch(err) {
+      showLoading(false);
+      showToast('❌ ' + err.message, 'error');
+    }
+  }
+
+</script>
+</body>
+</html>
