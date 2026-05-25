@@ -2234,7 +2234,7 @@
     el.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--text-light)">載入中...</div>';
     try {
       const y = currentYear, m = currentMonth;
-      const res  = await fetch(`${API_URL}?action=getMonthlyIncome&code=${PASSCODE}&year=${y}&month=${m}`);
+      const res  = await fetch(`${API_URL}?action=getMonthlyIncome&code=${PASSCODE}&year=${y}&month=${m}&user=${encodeURIComponent(selectedUser)}`);
       const data = await res.json();
       if (!data.success) throw new Error(data.error || '讀取失敗');
       const fmt = n => `NT$ ${Number(n || 0).toLocaleString()}`;
@@ -2264,7 +2264,7 @@
     el.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--text-light)">載入中...</div>';
     try {
       const y = currentYear, m = currentMonth;
-      const res  = await fetch(`${API_URL}?action=getExpenses&code=${PASSCODE}&year=${y}&month=${m}`);
+      const res  = await fetch(`${API_URL}?action=getExpenses&code=${PASSCODE}&year=${y}&month=${m}&user=${encodeURIComponent(selectedUser)}`);
       const data = await res.json();
       if (!data.success) throw new Error(data.error || '讀取失敗');
       const exps = data.expenses || [];
@@ -2301,7 +2301,7 @@
   }
 
   function editExpense(id) {
-    fetch(`${API_URL}?action=getExpenses&code=${PASSCODE}&year=${currentYear}&month=${currentMonth}`)
+    fetch(`${API_URL}?action=getExpenses&code=${PASSCODE}&year=${currentYear}&month=${currentMonth}&user=${encodeURIComponent(selectedUser)}`)
       .then(r => r.json())
       .then(data => {
         const ex = (data.expenses || []).find(e => e.id === id);
@@ -2346,9 +2346,9 @@
     showLoading(true, _editingExpId ? '更新支出中...' : '新增支出中...');
     try {
       const body = _editingExpId
-        ? { action:'updateExpense', code:PASSCODE, id:_editingExpId,
+        ? { action:'updateExpense', code:PASSCODE, user:selectedUser, id:_editingExpId,
             expense:{ type, payer, payDate, notes } }
-        : { action:'addExpense',    code:PASSCODE,
+        : { action:'addExpense',    code:PASSCODE, user:selectedUser,
             expense:{ type, payer, payDate, notes, yearMonth:ym } };
       const res  = await fetch(API_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body:JSON.stringify(body) });
       const data = await res.json();
@@ -2367,19 +2367,9 @@
     if (!confirm(`確定刪除「${type}」這筆支出記錄？`)) return;
     showLoading(true, '刪除中...');
     try {
-      const body = { action:'deleteExpense', code:PASSCODE, id };
+      const body = { action:'deleteExpense', code:PASSCODE, user:selectedUser, id };
       const res  = await fetch(API_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body:JSON.stringify(body) });
       const data = await res.json();
       if (!data.success) throw new Error(data.error || '刪除失敗');
       showLoading(false);
-      showToast('✅ 已刪除', 'success');
-      loadExpense();
-    } catch(err) {
-      showLoading(false);
-      showToast('❌ ' + err.message, 'error');
-    }
-  }
-
-</script>
-</body>
-</html>
+      showToast(
