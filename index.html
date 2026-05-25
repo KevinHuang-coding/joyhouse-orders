@@ -195,6 +195,9 @@
       max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
     }
     .order-arrow  { font-size:1.2rem; color:var(--text-light); flex:0 0 auto; }
+    .order-pay-row { display:flex; align-items:center; gap:.25rem; margin-top:.15rem; }
+    .order-pay-label { font-size:.72rem; color:var(--text-light); white-space:nowrap; }
+    .order-pay-val { font-size:.76rem; font-weight:700; color:var(--primary-dark); }
 
     /* Tags */
     .tag { display:inline-block; font-size:.72rem; font-weight:600; padding:.15rem .55rem; border-radius:999px; }
@@ -2071,16 +2074,19 @@
           </span>`).join('')
       : `<span class="card-staff-empty">尚無出勤人員</span>`;
 
-    // 付款 badge（訂金 + 尾款）
-    let payBadges = '';
-    if (order.depositAmount && Number(order.depositAmount) > 0) {
-      const paid = !!order.depositPaidDate;
-      payBadges += `<span class="payment-badge deposit">${paid ? '✅' : '⏳'}訂金 ${Number(order.depositAmount).toLocaleString()}</span> `;
-    }
-    if (order.finalAmount && Number(order.finalAmount) > 0) {
-      const paid = !!order.finalPaidDate;
-      payBadges += `<span class="payment-badge final">${paid ? '✅' : '⏳'}尾款 ${Number(order.finalAmount).toLocaleString()}</span>`;
-    }
+    // 付款資訊（永遠顯示）
+    const depAmt  = order.depositAmount && Number(order.depositAmount) > 0
+      ? (!!order.depositPaidDate ? '✅ ' : '⏳ ') + 'NT$\u00a0' + Number(order.depositAmount).toLocaleString()
+      : '－';
+    const finAmt  = order.finalAmount && Number(order.finalAmount) > 0
+      ? (!!order.finalPaidDate ? '✅ ' : '⏳ ') + 'NT$\u00a0' + Number(order.finalAmount).toLocaleString()
+      : '－';
+    const payLines = `<div class="order-pay-row">
+              <span class="order-pay-label">訂金 NTD：</span><span class="order-pay-val">${depAmt}</span>
+            </div>
+            <div class="order-pay-row">
+              <span class="order-pay-label">尾款 NTD：</span><span class="order-pay-val">${finAmt}</span>
+            </div>`;
 
     return `
       <div class="order-card ${cardClass}" onclick="showDetail('${esc(String(order.id))}')">
@@ -2095,7 +2101,7 @@
           ${order.venue    ? `<div class="order-venue">📍 ${esc(order.venue)}</div>` : ''}
           ${order.pmName   ? `<div class="order-pm">PM：${esc(order.pmName)}</div>` : ''}
           ${order.decoStyle? `<div class="order-deco">🎨 ${esc(order.decoStyle)}</div>` : ''}
-          ${payBadges      ? `<div class="order-tags" style="margin-top:.2rem">${payBadges}</div>` : ''}
+          ${payLines}
           <div class="card-staff-row"
                data-order-id="${esc(String(order.id))}"
                ondragover="_onDropZoneDragOver(event)"
