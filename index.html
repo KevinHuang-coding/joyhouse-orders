@@ -195,9 +195,12 @@
       max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
     }
     .order-arrow  { font-size:1.2rem; color:var(--text-light); flex:0 0 auto; }
-    .order-pay-row { display:flex; align-items:center; gap:.25rem; margin-top:.15rem; }
+    .order-pay-row { display:flex; align-items:center; gap:.3rem; margin-top:.15rem; }
     .order-pay-label { font-size:.72rem; color:var(--text-light); white-space:nowrap; }
     .order-pay-val { font-size:.76rem; font-weight:700; color:var(--primary-dark); }
+    .pay-status { font-size:.68rem; font-weight:700; padding:.1rem .45rem; border-radius:999px; white-space:nowrap; }
+    .pay-status.paid    { background:#D1FAE5; color:#065F46; }
+    .pay-status.pending { background:#FEF3C7; color:#92400E; }
 
     /* Tags */
     .tag { display:inline-block; font-size:.72rem; font-weight:600; padding:.15rem .55rem; border-radius:999px; }
@@ -2075,17 +2078,31 @@
       : `<span class="card-staff-empty">尚無出勤人員</span>`;
 
     // 付款資訊（永遠顯示）
-    const depAmt  = order.depositAmount && Number(order.depositAmount) > 0
-      ? (!!order.depositPaidDate ? '✅ ' : '⏳ ') + 'NT$\u00a0' + Number(order.depositAmount).toLocaleString()
+    const _depHas = order.depositAmount && Number(order.depositAmount) > 0;
+    const _finHas = order.finalAmount   && Number(order.finalAmount)   > 0;
+    const _depPaid = _depHas && !!order.depositPaidDate;
+    const _finPaid = _finHas && !!order.finalPaidDate;
+    const depAmt  = _depHas
+      ? 'NT$\u00a0' + Number(order.depositAmount).toLocaleString()
       : '－';
-    const finAmt  = order.finalAmount && Number(order.finalAmount) > 0
-      ? (!!order.finalPaidDate ? '✅ ' : '⏳ ') + 'NT$\u00a0' + Number(order.finalAmount).toLocaleString()
+    const finAmt  = _finHas
+      ? 'NT$\u00a0' + Number(order.finalAmount).toLocaleString()
       : '－';
+    const depStatus = _depHas
+      ? (_depPaid
+          ? '<span class="pay-status paid">已付款</span>'
+          : '<span class="pay-status pending">待付款</span>')
+      : '';
+    const finStatus = _finHas
+      ? (_finPaid
+          ? '<span class="pay-status paid">已付款</span>'
+          : '<span class="pay-status pending">待付款</span>')
+      : '';
     const payLines = `<div class="order-pay-row">
-              <span class="order-pay-label">訂金 NTD：</span><span class="order-pay-val">${depAmt}</span>
+              <span class="order-pay-label">訂金 NTD：</span><span class="order-pay-val">${depAmt}</span>${depStatus}
             </div>
             <div class="order-pay-row">
-              <span class="order-pay-label">尾款 NTD：</span><span class="order-pay-val">${finAmt}</span>
+              <span class="order-pay-label">尾款 NTD：</span><span class="order-pay-val">${finAmt}</span>${finStatus}
             </div>`;
 
     return `
