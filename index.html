@@ -1957,8 +1957,10 @@
   /** 渲染 pending chip（選完人員後的暫放狀態） */
   function _showPendingChip(area, name, date) {
     area.innerHTML = `
-      <span class="pending-hint">👆 拖曳至待命區或場次</span>
+      <span class="pending-hint">👆 拖曳至「今日待命人力」區</span>
       <span class="pool-chip pending-chip"
+            draggable="true"
+            ondragstart="_onPendingDragStart(event,'${esc(name)}','${esc(date)}')"
             data-name="${esc(name)}"
             data-date="${esc(date)}"
             data-is-pending="1">${esc(name)}</span>
@@ -1987,6 +1989,8 @@
     const chips = visible.length > 0
       ? visible.map(n => `
           <span class="pool-chip"
+                draggable="true"
+                ondragstart="_onChipDragStart(event,'${esc(n)}','pool','','${esc(date)}')"
                 data-name="${esc(n)}"
                 data-date="${esc(date)}">${esc(n)}<span class="pool-chip-remove"
                 onclick="removeFromPool(event,'${esc(date)}','${esc(n)}')"
@@ -1997,7 +2001,10 @@
     return `
       <div class="staff-pool-panel"
            data-drop-target="pool"
-           data-date="${esc(date)}">
+           data-date="${esc(date)}"
+           ondragover="_onPoolDragOver(event)"
+           ondragleave="_onPoolDragLeave(event)"
+           ondrop="_onDropToPool(event,'${esc(date)}')">
         <div class="pool-panel-label">💤 今日待命人力（${visible.length} 人）</div>
         <div class="pool-chips-row">${chips}</div>
       </div>`;
@@ -2153,6 +2160,56 @@
       const el = e.target.closest('.card-staff-chip, .pool-chip');
       if (el) el.classList.add('drag-source');
     }, 0);
+  }
+
+  /** pending chip（選單選完尚未入池）開始拖曳 */
+  function _onPendingDragStart(e, name, date) {
+    _dragData = { name, from: 'pending', date };
+    e.dataTransfer.effectAllowed = 'move';
+    setTimeout(() => {
+      const el = e.target.closest('.pending-chip');
+      if (el) el.classList.add('drag-source');
+    }, 0);
+  }
+
+  /** pool 接收區 dragover：接受 pending 或 order 來源 */
+  function _onPoolDragOver(e) {
+    if (_dragData && (_dragData.from === 'pending' || _dragData.from === 'order')) {
+      e.preventDefault();
+      e.currentTarget.classList.add('drop-active');
+    }
+  }
+
+  function _onPoolDragLeave(e) {
+    e.currentTarget.classList.remove('drop-active');
+  }
+
+  /** pool 接收區 drop */
+  async function _onDropToPool(e, date) {
+    e.preventDefault();
+    e.currentTarget.classList.remove('drop-active');
+    if (!_dragData) return;
+    const { name, from } = _dragData;
+    _dragData = null;
+
+    if (from === 'pending') {
+      // pending → pool：加入待命池，清除 pending 區
+      if (!_poolState[date]) _poolState[date] = [];
+      if (!_poolState[date].includes(name)) {
+        _poolState[date].push(name);
+        _savePool();
+      }
+      const area = document.getElementById('pending-' + date);
+      if (area) area.innerHTML = '';
+      renderOrders();
+      showToast(`✅ ${name} 已加入今日待命`, 'success');
+
+    } else if (from === 'order') {
+      // order → pool：把人員從訂單移回待命池
+      const order = allOrders.find(o => parseStaffNames(o.staff).includes(name) && o.date === date);
+      if (!order) return;
+      await removeFromOrder({ stopPropagation(){}, preventDefault(){} }, String(order.id), name);
+    }
   }
 
   function _onDropZoneDragOver(e) {
