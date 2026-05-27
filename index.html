@@ -1963,7 +1963,13 @@
    */
   function _syncPoolDateToGAS(date) {
     if (!date) return;
-    const pool = _poolState[date] || [];
+    const poolAll = _poolState[date] || [];
+    // 只同步「尚未指派到訂單」的待命人員（與 UI 顯示一致）
+    const assignedSet = new Set();
+    allOrders.filter(o => o.date === date).forEach(o =>
+      parseStaffNames(o.staff).forEach(n => assignedSet.add(n))
+    );
+    const pool = poolAll.filter(n => !assignedSet.has(n));
     fetch(API_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain' },
