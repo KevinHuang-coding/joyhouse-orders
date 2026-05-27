@@ -1571,7 +1571,7 @@
         const isSelected  = selectedStaff.includes(name);
         const isConflict  = conflicted.has(name);
         const cls = isConflict ? 'conflicted' : isSelected ? 'selected' : '';
-        return `<button class="staff-chip \${cls}" onclick="toggleStaff('\${esc(name)}')" \${isConflict ? 'disabled title="此人員同時段已有其他場次"' : ''}>\${esc(name)}</button>`;
+        return `<button class="staff-chip ${cls}" onclick="toggleStaff('${esc(name)}')" ${isConflict ? 'disabled title=\"此人員同時段已有其他場次\"' : ''}>${esc(name)}</button>`;
       }).join('') +
       `<button class="staff-chip other-btn" id="other-chip-btn" onclick="toggleOtherInput()">＋ 其他人員</button>`;
     }
@@ -1984,7 +1984,8 @@
   function onStaffSelect(sel, date) {
     const name = sel.value;
     if (!name) return;
-    sel.value = ''; // 重設選單
+    // 延遲重設選單，避免 iOS native picker touchend 時機衝突導致閃退
+    setTimeout(() => { sel.value = ''; }, 80);
     const area = document.getElementById('pending-' + date);
     if (!area) return;
 
@@ -2353,6 +2354,10 @@
 
   function _tdStart(e) {
     const t = e.target;
+    // 忽略 select / option / input / button（避免 iOS dropdown 觸發拖曳）
+    if (t.tagName === 'SELECT' || t.tagName === 'OPTION' ||
+        t.tagName === 'INPUT'  || t.tagName === 'BUTTON' ||
+        t.closest('select')) return;
     // 如果點到 ✕ 按鈕，不啟動拖曳
     if (t.closest('.pool-chip-remove, .card-staff-remove, .pending-cancel')) return;
     const chip = t.closest('[data-drag-name]');
