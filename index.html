@@ -1944,12 +1944,71 @@
   // =====================================================
 
   // ── 待命人力池 localStorage 狀態管理 ──────────────────────
+  /** 從 localStorage 載入池狀態，並背景從 GAS 同步本月資料 */
   function _loadPool() {
     try { _poolState = JSON.parse(localStorage.getItem('mw_pool') || '{}'); }
     catch(e) { _poolState = {}; }
+    // 背景從 GAS 拉取當月所有日期的待命池（不阻塞 UI）
+    _syncPoolFromGAS();
   }
+
+  /** 儲存至 localStorage 並非同步推送到 GAS */
   function _savePool() {
     localStorage.setItem('mw_pool', JSON.stringify(_poolState));
+  }
+
+  /**
+   * 推送單一日期的待命池到 GAS（fire-and-forget，不阻塞 UI）
+   * 在 _poolState[date] 有變動後呼叫
+   */
+  function _syncPoolDateToGAS(date) {
+    if (!date) return;
+    const pool = _poolState[date] || [];
+    fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ action: 'updatePool', code: PASSCODE, user: selectedUser, date, pool })
+    }).then(r => r.json()).then(d => {
+      if (!d.success) console.warn('pool sync failed:', d.error);
+    }).catch(err => console.warn('pool sync error:', err));
+  }
+
+  /**
+   * 從 GAS 拉取當月所有可見日期的待命池
+   * 合併策略：GAS 為主，本地若有更新則以時間戳決定（目前直接以 GAS 覆蓋）
+   */
+  async function _syncPoolFromGAS() {
+    try {
+      // 收集當前列表中出現的所有日期
+      const dates = [...new Set(allOrders.map(o => o.date).filter(Boolean))];
+      // 加入今日日期確保一定同步
+      const today = new Date().toLocaleDateString('sv-SE');
+      if (!dates.includes(today)) dates.push(today);
+
+      let updated = false;
+      // 逐一拉取（GAS 不支援批次 getPool，改為 Promise.all 並行）
+      await Promise.all(dates.map(async date => {
+        try {
+          const url = `${API_URL}?action=getPool&code=${PASSCODE}&date=${date}`;
+          const res  = await fetch(url);
+          const data = await res.json();
+          if (data.success && Array.isArray(data.pool)) {
+            // 只有 GAS 有資料時才覆蓋本地（避免清空剛剛新增的資料）
+            if (data.pool.length > 0 || (_poolState[date] || []).length === 0) {
+              _poolState[date] = data.pool;
+              updated = true;
+            }
+          }
+        } catch(e) { /* 單一日期失敗不影響其他 */ }
+      }));
+
+      if (updated) {
+        localStorage.setItem('mw_pool', JSON.stringify(_poolState));
+        renderOrders(); // 更新 UI 顯示最新待命名單
+      }
+    } catch(err) {
+      console.warn('_syncPoolFromGAS error:', err);
+    }
   }
 
   /**
@@ -2098,6 +2157,7 @@
     if (!_poolState[date]) _poolState[date] = [];
     if (!_poolState[date].includes(name)) _poolState[date].push(name);
     _savePool();
+    _syncPoolDateToGAS(date); // 推送到 GAS
     renderOrders(); // 立刻反應，不等 API
 
     // 背景送 API
@@ -2121,6 +2181,7 @@
     if (_poolState[date]) {
       _poolState[date] = _poolState[date].filter(n => n !== name);
       _savePool();
+      _syncPoolDateToGAS(date); // 推送到 GAS
       renderOrders();
       showToast(`${name} 已從待命名單移除`, 'success');
     }
@@ -2275,6 +2336,7 @@
       if (!_poolState[date].includes(name)) {
         _poolState[date].push(name);
         _savePool();
+        _syncPoolDateToGAS(date);
       }
       const area = document.getElementById('pending-' + date);
       if (area) area.innerHTML = '';
@@ -2451,6 +2513,7 @@
         if (!_poolState[poolDate].includes(name)) {
           _poolState[poolDate].push(name);
           _savePool();
+          _syncPoolDateToGAS(poolDate);
         }
         const area = document.getElementById('pending-' + poolDate);
         if (area) area.innerHTML = '';
