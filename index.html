@@ -602,6 +602,27 @@
     .pool-chip-remove:active { background: #FEE2E2; color: var(--danger); }
 
 
+
+    /* Pool Source Note（選單來源說明） */
+    .pool-source-note {
+      font-size: .72rem; color: var(--primary); font-weight: 600;
+      margin-top: .3rem; padding: .25rem .6rem;
+      background: #FFF8E6; border-left: 3px solid var(--gold);
+      border-radius: 0 .4rem .4rem 0;
+      display: block;
+    }
+    /* Modal 待命池說明標籤 */
+    .modal-pool-label {
+      font-size: .73rem; color: var(--primary); font-weight: 600;
+      padding: .35rem .875rem .15rem;
+      display: flex; align-items: center; gap: .3rem;
+    }
+    /* 空池警示 */
+    .pool-empty-notice {
+      text-align: center; padding: 1.5rem 1rem;
+      color: var(--text-light); font-size: .88rem; line-height: 1.6;
+    }
+    .pool-empty-notice strong { color: var(--primary); display: block; margin-bottom: .35rem; font-size: .95rem; }
     /* ── Touch Drag Ghost & Drop Highlight ────────────── */
     .touch-drag-ghost {
       position: fixed; z-index: 9999; pointer-events: none;
@@ -716,6 +737,7 @@
       <button class="modal-close" onclick="closeStaffPicker()">✕ 完成</button>
     </div>
     <div class="conflict-notice" id="conflict-notice">⚠️ 灰色人員已被同時段其他場次佔用（同日期+宴會類型）</div>
+    <div class="modal-pool-label" id="modal-pool-label">💤 以下人員來自「本日待命人力區」</div>
     <div class="modal-scroll">
       <div class="staff-options-grid" id="staff-options-grid"></div>
       <div class="other-input-row" id="other-input-row">
@@ -920,6 +942,7 @@
           <span id="staff-picker-placeholder">點此選擇出勤人員...</span>
           <span style="font-size:.85rem">▼</span>
         </button>
+        <span class="pool-source-note">💤 選單人員來自「本日待命人力區」，請先在首頁將人員加入待命</span>
         <div class="staff-tags-display" id="staff-tags-display"></div>
         <button type="button" class="comparison-trigger" id="comparison-trigger-form" onclick="showComparisonFromForm()" style="display:none">
           📊 查看同時段所有場次人力分配
@@ -1516,18 +1539,42 @@
     const notice = document.getElementById('conflict-notice');
     notice.classList.toggle('show', conflicted.size > 0);
 
-    // 已選中但不在 STAFF_LIST 的自訂人員
-    const customSelected = selectedStaff.filter(n => !STAFF_LIST.includes(n));
-    const allNames = [...STAFF_LIST, ...customSelected];
+    // ── 只顯示本日待命人力池的人員 ──
+    const pool = _poolState[date] || [];
+    // 已選但不在池中的（例如舊訂單已指派、或手動加入的自訂人員）─ 保留顯示避免消失
+    const extraSelected = selectedStaff.filter(n => !pool.includes(n));
+    const allNames = [...pool, ...extraSelected];
+
+    // 更新 modal 池來源標籤
+    const poolLabel = document.getElementById('modal-pool-label');
+    if (poolLabel) {
+      if (pool.length > 0) {
+        poolLabel.textContent = '💤 以下 ' + pool.length + ' 人來自「本日待命人力區」';
+        poolLabel.style.display = '';
+      } else {
+        poolLabel.style.display = 'none';
+      }
+    }
 
     const grid = document.getElementById('staff-options-grid');
-    grid.innerHTML = allNames.map(name => {
-      const isSelected  = selectedStaff.includes(name);
-      const isConflict  = conflicted.has(name);
-      const cls = isConflict ? 'conflicted' : isSelected ? 'selected' : '';
-      return `<button class="staff-chip ${cls}" onclick="toggleStaff('${esc(name)}')" ${isConflict ? 'disabled title="此人員同時段已有其他場次"' : ''}>${esc(name)}</button>`;
-    }).join('') +
-    `<button class="staff-chip other-btn" id="other-chip-btn" onclick="toggleOtherInput()">＋ 其他人員</button>`;
+    if (pool.length === 0 && extraSelected.length === 0) {
+      // 待命池為空
+      grid.innerHTML = `<div class="pool-empty-notice">
+        <strong>⚠️ 今日待命人力池為空</strong>
+        請先回到主畫面，從「選擇人員加入今日名單」<br>
+        將人員拖曳加入「今日待命人力區」，<br>再回到此處選擇出勤人員。
+        <br><br>
+        <button class="staff-chip other-btn" id="other-chip-btn" onclick="toggleOtherInput()" style="margin-top:.5rem">＋ 緊急：直接輸入人員名稱</button>
+      </div>`;
+    } else {
+      grid.innerHTML = allNames.map(name => {
+        const isSelected  = selectedStaff.includes(name);
+        const isConflict  = conflicted.has(name);
+        const cls = isConflict ? 'conflicted' : isSelected ? 'selected' : '';
+        return `<button class="staff-chip \${cls}" onclick="toggleStaff('\${esc(name)}')" \${isConflict ? 'disabled title="此人員同時段已有其他場次"' : ''}>\${esc(name)}</button>`;
+      }).join('') +
+      `<button class="staff-chip other-btn" id="other-chip-btn" onclick="toggleOtherInput()">＋ 其他人員</button>`;
+    }
 
     updateSelectedCount();
     document.getElementById('staff-picker-modal').classList.remove('hidden');
@@ -1551,7 +1598,9 @@
     const date = document.getElementById('f-date').value;
     const mealType = document.querySelector('input[name="mealType"]:checked')?.value;
     const conflicted = getConflictedStaff(date, mealType, editingOrderId);
-    const allNames = [...STAFF_LIST, ...selectedStaff.filter(n => !STAFF_LIST.includes(n))];
+    const pool2 = _poolState[date] || [];
+    const extra2 = selectedStaff.filter(n => !pool2.includes(n));
+    const allNames = [...pool2, ...extra2];
     chips.forEach((chip, i) => {
       const n = allNames[i];
       if (!n) return;
