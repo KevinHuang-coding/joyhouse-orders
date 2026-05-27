@@ -508,10 +508,10 @@
     .card-staff-chip.drag-source { opacity: .28; }
     .card-staff-remove {
       display: inline-flex; align-items: center; justify-content: center;
-      margin-left: .1rem; font-size: .72rem; font-weight: 700;
-      color: rgba(196,134,10,.45); cursor: pointer;
-      width: 1.1rem; height: 1.1rem;
-      border-radius: 50%; background: rgba(196,134,10,.08);
+      margin-left: .15rem; font-size: .72rem; font-weight: 700;
+      color: rgba(196,134,10,.55); cursor: pointer;
+      width: 1.6rem; height: 1.6rem;          /* 放大觸控區 */
+      border-radius: 50%; background: rgba(196,134,10,.1);
       line-height: 1; flex-shrink: 0;
       transition: background .15s, color .15s;
     }
@@ -584,8 +584,9 @@
       cursor: grab; touch-action: none;
     }
     .pending-cancel {
-      font-size: .75rem; color: var(--text-light); cursor: pointer;
-      padding: .1rem .4rem; border-radius: 999px; background: rgba(0,0,0,.06);
+      font-size: .78rem; color: var(--text-light); cursor: pointer;
+      padding: .35rem .75rem; border-radius: 999px; background: rgba(0,0,0,.08);
+      margin-left: .5rem; white-space: nowrap; font-weight: 600;
     }
 
     /* Pool chip remove button — 加大觸控範圍，獨立處理避免被拖曳事件吃掉 */
@@ -593,13 +594,27 @@
       display: inline-flex; align-items: center; justify-content: center;
       margin-left: .25rem; font-size: .75rem; font-weight: 700;
       color: rgba(196,134,10,.55); cursor: pointer;
-      width: 1.3rem; height: 1.3rem;
-      border-radius: 50%; background: rgba(196,134,10,.08);
+      width: 1.6rem; height: 1.6rem;          /* 放大觸控區 */
+      border-radius: 50%; background: rgba(196,134,10,.1);
       vertical-align: middle; line-height: 1;
       transition: background .15s, color .15s;
     }
     .pool-chip-remove:active { background: #FEE2E2; color: var(--danger); }
 
+
+    /* ── Touch Drag Ghost & Drop Highlight ────────────── */
+    .touch-drag-ghost {
+      position: fixed; z-index: 9999; pointer-events: none;
+      opacity: .82; transform: scale(1.1) rotate(2deg);
+      box-shadow: 0 8px 28px rgba(0,0,0,.28);
+      transition: none !important;
+      border-radius: 999px;
+    }
+    .touch-drop-active {
+      background: #FFF8DC !important;
+      border-color: var(--primary-light) !important;
+      box-shadow: 0 0 0 2px var(--primary-light) !important;
+    }
     /* 手動輸入姓名（其他人員） */
     .other-name-row {
       display: flex; align-items: center; gap: .4rem; width: 100%;
@@ -1961,6 +1976,9 @@
       <span class="pool-chip pending-chip"
             draggable="true"
             ondragstart="_onPendingDragStart(event,'${esc(name)}','${esc(date)}')"
+            data-drag-name="${esc(name)}"
+            data-drag-from="pending"
+            data-drag-date="${esc(date)}"
             data-name="${esc(name)}"
             data-date="${esc(date)}"
             data-is-pending="1">${esc(name)}</span>
@@ -1991,6 +2009,9 @@
           <span class="pool-chip"
                 draggable="true"
                 ondragstart="_onChipDragStart(event,'${esc(n)}','pool','','${esc(date)}')"
+                data-drag-name="${esc(n)}"
+                data-drag-from="pool"
+                data-drag-date="${esc(date)}"
                 data-name="${esc(n)}"
                 data-date="${esc(date)}">${esc(n)}<span class="pool-chip-remove"
                 onclick="removeFromPool(event,'${esc(date)}','${esc(n)}')"
@@ -2076,6 +2097,10 @@
       ? names.map(n => `
           <span class="card-staff-chip" draggable="true"
                 ondragstart="_onChipDragStart(event,'${esc(n)}','order','${esc(String(order.id))}','${esc(order.date)}')"
+                data-drag-name="${esc(n)}"
+                data-drag-from="order"
+                data-drag-order-id="${esc(String(order.id))}"
+                data-drag-date="${esc(order.date)}"
                 onclick="event.stopPropagation()">
             ${esc(n)}
             <span class="card-staff-remove"
@@ -2128,6 +2153,7 @@
           ${payLines}
           <div class="card-staff-row"
                data-order-id="${esc(String(order.id))}"
+               data-date="${esc(order.date)}"
                ondragover="_onDropZoneDragOver(event)"
                ondrop="_onDropToCard(event,'${esc(String(order.id))}','${esc(order.date)}')"
                ondragleave="_onDropZoneDragLeave(event)"
@@ -2151,6 +2177,7 @@
     document.addEventListener('dragend', () => {
       document.querySelectorAll('.drag-source').forEach(el => el.classList.remove('drag-source'));
     });
+    _initTouchDrag(); // 手機 touch 拖曳系統
   }
 
   function _onChipDragStart(e, name, from, orderId, date) {
@@ -2256,6 +2283,150 @@
       renderOrders();
       showToast('⚠️ 指派失敗，已自動還原', 'error');
     }
+  }
+
+
+  // =====================================================
+  //  Touch 拖曳系統（手機）
+  //  三層人力池：pending → pool → order card
+  // =====================================================
+  let _td = { active:false, data:null, startX:0, startY:0, offsetX:0, offsetY:0, ghost:null, srcEl:null };
+  let _tdInitialized = false;
+
+  function _initTouchDrag() {
+    if (_tdInitialized) return;
+    _tdInitialized = true;
+    document.addEventListener('touchstart',  _tdStart,  { passive: true  });
+    document.addEventListener('touchmove',   _tdMove,   { passive: false });
+    document.addEventListener('touchend',    _tdEnd,    { passive: false });
+    document.addEventListener('touchcancel', _tdCancel, { passive: false });
+  }
+
+  function _tdStart(e) {
+    const t = e.target;
+    // 如果點到 ✕ 按鈕，不啟動拖曳
+    if (t.closest('.pool-chip-remove, .card-staff-remove, .pending-cancel')) return;
+    const chip = t.closest('[data-drag-name]');
+    if (!chip) return;
+    const touch = e.touches[0];
+    _td.startX  = touch.clientX;
+    _td.startY  = touch.clientY;
+    _td.srcEl   = chip;
+    _td.active  = false;
+    _td.data    = {
+      name:    chip.dataset.dragName,
+      from:    chip.dataset.dragFrom,
+      orderId: chip.dataset.dragOrderId || '',
+      date:    chip.dataset.dragDate || '',
+    };
+  }
+
+  function _tdMove(e) {
+    if (!_td.data || !_td.srcEl) return;
+    const touch = e.touches[0];
+    const dx = touch.clientX - _td.startX;
+    const dy = touch.clientY - _td.startY;
+
+    if (!_td.active) {
+      if (Math.hypot(dx, dy) < 10) return; // 移動未超過閾值
+      // ── 開始拖曳 ──
+      _td.active = true;
+      _dragData  = _td.data; // 同步桌機系統
+
+      const rect = _td.srcEl.getBoundingClientRect();
+      _td.offsetX = _td.startX - rect.left;
+      _td.offsetY = _td.startY - rect.top;
+
+      // 建立視覺幽靈
+      const ghost = _td.srcEl.cloneNode(true);
+      ghost.classList.add('touch-drag-ghost');
+      // 移除 ghost 內的 ✕ 按鈕，避免誤觸
+      ghost.querySelectorAll('.pool-chip-remove,.card-staff-remove,.pending-cancel').forEach(el => el.remove());
+      ghost.style.left   = (touch.clientX - _td.offsetX) + 'px';
+      ghost.style.top    = (touch.clientY - _td.offsetY) + 'px';
+      ghost.style.width  = rect.width + 'px';
+      document.body.appendChild(ghost);
+      _td.ghost = ghost;
+      _td.srcEl.classList.add('drag-source');
+    }
+
+    if (_td.active) {
+      e.preventDefault(); // 拖曳中鎖定滾動
+      _td.ghost.style.left = (touch.clientX - _td.offsetX) + 'px';
+      _td.ghost.style.top  = (touch.clientY - _td.offsetY) + 'px';
+
+      // 偵測手指下方的 drop zone
+      _td.ghost.style.visibility = 'hidden';
+      const elUnder = document.elementFromPoint(touch.clientX, touch.clientY);
+      _td.ghost.style.visibility = '';
+
+      document.querySelectorAll('.touch-drop-active').forEach(el => el.classList.remove('touch-drop-active'));
+      if (elUnder) {
+        const poolEl = elUnder.closest('[data-drop-target="pool"]');
+        const cardEl = elUnder.closest('.card-staff-row');
+        const from = _td.data.from;
+        if (poolEl && (from === 'pending' || from === 'order')) poolEl.classList.add('touch-drop-active');
+        else if (cardEl && from === 'pool') cardEl.classList.add('touch-drop-active');
+      }
+    }
+  }
+
+  async function _tdEnd(e) {
+    if (!_td.active || !_td.data) { _tdReset(); return; }
+    e.preventDefault();
+
+    const touch = e.changedTouches[0];
+    const { name, from, orderId, date } = _td.data;
+
+    // 暫時隱藏 ghost，取得手指下方元素
+    if (_td.ghost) _td.ghost.style.visibility = 'hidden';
+    const elUnder = document.elementFromPoint(touch.clientX, touch.clientY);
+    if (_td.ghost) _td.ghost.style.visibility = '';
+
+    _tdReset(); // 清理視覺狀態
+
+    if (!elUnder) return;
+    const poolEl = elUnder.closest('[data-drop-target="pool"]');
+    const cardEl = elUnder.closest('.card-staff-row');
+
+    if (poolEl && (from === 'pending' || from === 'order')) {
+      // ── 放入待命池 ──
+      const poolDate = poolEl.dataset.date;
+      if (from === 'pending') {
+        if (!_poolState[poolDate]) _poolState[poolDate] = [];
+        if (!_poolState[poolDate].includes(name)) {
+          _poolState[poolDate].push(name);
+          _savePool();
+        }
+        const area = document.getElementById('pending-' + poolDate);
+        if (area) area.innerHTML = '';
+        renderOrders();
+        showToast('✅ ' + name + ' 已加入今日待命', 'success');
+      } else if (from === 'order') {
+        const order = allOrders.find(o => parseStaffNames(o.staff).includes(name) && o.date === poolDate);
+        if (order) await removeFromOrder({ stopPropagation(){}, preventDefault(){} }, String(order.id), name);
+      }
+
+    } else if (cardEl && from === 'pool') {
+      // ── 放入訂單 ──
+      const cardOrderId = cardEl.dataset.orderId;
+      const cardDate    = cardEl.dataset.date;
+      if (cardOrderId && cardDate) await _assignToOrder(name, cardOrderId, cardDate);
+    }
+
+    _dragData = null;
+  }
+
+  function _tdCancel() {
+    _tdReset();
+    _dragData = null;
+  }
+
+  function _tdReset() {
+    if (_td.ghost) { _td.ghost.remove(); }
+    if (_td.srcEl) { _td.srcEl.classList.remove('drag-source'); }
+    document.querySelectorAll('.touch-drop-active').forEach(el => el.classList.remove('touch-drop-active'));
+    _td = { active:false, data:null, startX:0, startY:0, offsetX:0, offsetY:0, ghost:null, srcEl:null };
   }
 
   // =====================================================
