@@ -2389,7 +2389,7 @@
     }
     renderOrders();
     try {
-      const body = { action:'updateOrder', code:PASSCODE, id:orderId, staff:order.staff };
+      const body = { action:'updateOrder', code:PASSCODE, user:selectedUser, id:orderId, order:{ staff:order.staff } };
       const res  = await fetch(API_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body:JSON.stringify(body) });
       const data = await res.json();
       if (!data.success) throw new Error(data.error);
