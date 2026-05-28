@@ -1077,7 +1077,8 @@
   let PASSCODE       = '';
   let currentPin     = '';
   let selectedUser   = '';
-  let editingOrderId = null;
+  let editingOrderId       = null;
+  let _editingOriginalDate = '';   // 編輯訂單時記錄原始日期，供改期衝突檢查使用
   let currentYear    = new Date().getFullYear();
   let currentMonth   = new Date().getMonth() + 1;
   let allOrders      = [];
@@ -1158,7 +1159,8 @@
   function showEditOrder(id) {
     const order = allOrders.find(o => String(o.id) === String(id));
     if (!order) return;
-    editingOrderId = id;
+    editingOrderId       = id;
+    _editingOriginalDate = order.date || '';   // 記錄原始日期
     document.getElementById('form-title').textContent = '✏️ 編輯場次訂單';
     document.getElementById('f-date').value       = order.date || '';
     document.getElementById('f-client').value     = order.clientName || '';
@@ -1446,10 +1448,34 @@
     }
 
     const isEditing = !!editingOrderId;
+
+    // ── 改期人力衝突檢查（編輯模式 + 日期有變更） ──
+    if (isEditing && _editingOriginalDate && _editingOriginalDate !== date) {
+      showLoading(true, '檢查人力衝突中...');
+      const conflictMap = await _checkDateConflicts(date, selectedStaff, editingOrderId);
+      showLoading(false);
+      if (Object.keys(conflictMap).length > 0) {
+        // 組成警告訊息
+        const conflictLines = Object.entries(conflictMap).map(([name, order]) =>
+          '• ' + name + ' → 與「' + (order.clientName || '(未知客戶)') + '」' + (order.mealType ? order.mealType : '') + ' 訂單衝突'
+        );
+        const msg = `⚠️ 改期人力衝突\n\n將訂單從 ${_editingOriginalDate} 改到 ${date} 時，\n以下人員在新日期已有出勤安排：\n\n` +
+          conflictLines.join('\n') +
+          `\n\n✅ 其他人員可正常移動\n❌ 衝突人員將自動從此訂單移除\n\n確定繼續改期嗎？`;
+        if (!confirm(msg)) return;
+        // 移除衝突人員
+        const conflictNames = Object.keys(conflictMap);
+        selectedStaff = selectedStaff.filter(s => !conflictNames.includes(s));
+        renderStaffTags();
+        showToast('⚠️ 已移除衝突人員：' + conflictNames.join('、'), 'warning');
+      }
+    }
+
     showLoading(true, isEditing ? '更新訂單中...' : '新增訂單中...');
     try {
+      const staffFinal   = selectedStaff.join(' / ');   // 衝突移除後重新組合
       const decoStyle    = _getDecoStyleValue();
-      const orderPayload = { date, clientName: client, eventType, venue, hall, mealType, pmName: pm, staff, staffRequired, notes, decoStyle };
+      const orderPayload = { date, clientName: client, eventType, venue, hall, mealType, pmName: pm, staff: staffFinal, staffRequired, notes, decoStyle };
       const body = isEditing
         ? { action: 'updateOrder', code: PASSCODE, user: selectedUser, id: editingOrderId, order: orderPayload }
         : { action: 'addOrder',   code: PASSCODE, user: selectedUser, order: orderPayload };
@@ -1671,6 +1697,49 @@
   function parseStaffNames(staffStr) {
     if (!staffStr) return [];
     return staffStr.split(/[\/,、\n]/).map(s => s.trim()).filter(Boolean);
+  }
+
+  // ---------- 改期人力衝突檢查 ----------
+  /**
+   * 檢查 newDate 上是否有人力衝突
+   * @param {string} newDate - 新日期 YYYY-MM-DD
+   * @param {string[]} staffList - 此訂單目前的出勤人員陣列
+   * @param {string|number} excludeId - 自身訂單 ID（排除自己）
+   * @returns {Object} conflictMap: { '人員名': { clientName, mealType, ... } }
+   */
+  async function _checkDateConflicts(newDate, staffList, excludeId) {
+    if (!staffList || staffList.length === 0) return {};
+
+    const [newYear, newMonth] = newDate.split('-').map(Number);
+    let ordersToCheck = allOrders;
+
+    // 若新日期跨月，需另外 fetch 該月訂單
+    if (newYear !== currentYear || newMonth !== currentMonth) {
+      try {
+        const res  = await fetch(API_URL + '?action=getOrders&code=' + PASSCODE + '&month=' + newMonth + '&year=' + newYear);
+        const data = await res.json();
+        ordersToCheck = data.success ? (data.orders || []) : [];
+      } catch (e) {
+        ordersToCheck = [];
+      }
+    }
+
+    // 篩出新日期上的其他訂單（排除自身）
+    const ordersOnNewDate = ordersToCheck.filter(o =>
+      o.date === newDate && String(o.id) !== String(excludeId)
+    );
+
+    const conflictMap = {};
+    for (const staffName of staffList) {
+      for (const existingOrder of ordersOnNewDate) {
+        const existingStaff = parseStaffNames(existingOrder.staff);
+        if (existingStaff.includes(staffName)) {
+          conflictMap[staffName] = existingOrder;
+          break;
+        }
+      }
+    }
+    return conflictMap;
   }
 
   // ---------- Staff Warning ----------
