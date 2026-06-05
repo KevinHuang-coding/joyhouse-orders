@@ -2866,16 +2866,16 @@
       const fmt = n => `NT$ ${Number(n || 0).toLocaleString()}`;
       const bt = data.byType || {};
       const typeMeta = [
-        { key:'婚禮', icon:'💒', color:'#BE185D' },
-        { key:'商業', icon:'🏢', color:'#1D4ED8' },
-        { key:'其他', icon:'📦', color:'#92400E' }
+        { key:'婚禮場', icon:'💒', color:'#BE185D' },
+        { key:'商業場', icon:'🏢', color:'#1D4ED8' },
+        { key:'其他',   icon:'📦', color:'#92400E' }
       ];
       const typeCards = typeMeta.map(function (t) {
         const o = bt[t.key] || { deposit:0, final:0 };
         const sub = (o.deposit || 0) + (o.final || 0);
         return `
           <div class="finance-type-card" style="border-left:4px solid ${t.color}">
-            <div class="finance-type-head"><span>${t.icon} ${t.key}場</span><span class="finance-type-sum">${fmt(sub)}</span></div>
+            <div class="finance-type-head"><span>${t.icon} ${t.key}</span><span class="finance-type-sum">${fmt(sub)}</span></div>
             <div class="finance-type-row">
               <span>💵 訂金 ${fmt(o.deposit)}</span>
               <span>💰 尾款 ${fmt(o.final)}</span>
