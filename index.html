@@ -678,6 +678,17 @@
     .payment-badge.deposit { background:#D1FAE5; color:#065F46; }
     .payment-badge.final   { background:#DBEAFE; color:#1E40AF; }
     .payment-badge.partial { background:#FEF3C7; color:#92400E; }
+    .invoice-photo-btn { display:inline-flex; align-items:center; gap:.3rem; background:#EEF2FF; color:#4338CA; border:1px solid #C7D2FE; border-radius:.5rem; padding:.4rem .7rem; font-size:.78rem; font-weight:600; cursor:pointer; }
+    .invoice-photo-link { font-size:.74rem; color:var(--primary); text-decoration:underline; margin-left:.4rem; }
+    .extra-dep-card { background:#FFFBEB; border:1px solid #FDE68A; border-radius:.625rem; padding:.625rem; margin:.25rem 0 .5rem; }
+    .extra-dep-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:.4rem; }
+    .extra-dep-head .t { font-size:.76rem; font-weight:700; color:#92400E; }
+    .extra-dep-del { background:#FEF2F2; color:var(--danger); border:1px solid #FECACA; border-radius:.4rem; padding:.15rem .5rem; font-size:.72rem; cursor:pointer; }
+    .add-extra-dep-btn { width:100%; padding:.6rem; background:#FEF3C7; color:#92400E; border:1px dashed #F59E0B; border-radius:.625rem; font-size:.82rem; font-weight:600; cursor:pointer; margin:.25rem 0 .75rem; }
+    .finance-type-card { background:white; border-radius:.75rem; padding:.7rem .85rem; margin-bottom:.5rem; box-shadow:var(--shadow); }
+    .finance-type-head { display:flex; justify-content:space-between; align-items:center; font-weight:700; font-size:.9rem; color:var(--text); }
+    .finance-type-sum { color:#065F46; }
+    .finance-type-row { display:flex; justify-content:space-between; font-size:.8rem; color:var(--text-light); margin-top:.35rem; }
 
     /* ===== FINANCE SCREEN ===== */
     #finance-screen { background:var(--bg); }
@@ -1050,8 +1061,29 @@
         </select>
       </div>
       <div class="expense-form-field">
-        <label class="expense-form-label">付款日期<span class="required">*</span></label>
+        <label class="expense-form-label">金額<span class="required">*</span></label>
+        <input type="number" class="form-input" id="ef-amount" placeholder="例：3000" inputmode="numeric">
+      </div>
+      <div class="expense-form-field">
+        <label class="expense-form-label">實際支出日期<span class="required">*</span></label>
         <input type="date" class="form-input" id="ef-date">
+      </div>
+      <div class="expense-form-field">
+        <label class="expense-form-label" style="display:flex;align-items:center;gap:.5rem;cursor:pointer">
+          <input type="checkbox" id="ef-invoice-kid" onchange="onInvoiceKidChange()" style="width:1.1rem;height:1.1rem"> 發票是否已提供給 Kid？
+        </label>
+      </div>
+      <div class="expense-form-field">
+        <label class="expense-form-label">發票後五碼</label>
+        <input type="text" class="form-input" id="ef-invoice5" placeholder="有發票才填，保留首字0亦可" maxlength="5" inputmode="numeric">
+      </div>
+      <div class="expense-form-field">
+        <label class="expense-form-label">憑證類型（若無發票）</label>
+        <select class="expense-form-select" id="ef-cert-type">
+          <option value="">－ 有發票免填 －</option>
+          <option value="免用統一發票收據">免用統一發票收據</option>
+          <option value="其他類型憑證">其他類型憑證</option>
+        </select>
       </div>
       <div class="expense-form-field">
         <label class="expense-form-label">備註</label>
@@ -1084,6 +1116,10 @@
   let currentMonth   = new Date().getMonth() + 1;
   let allOrders      = [];
   let currentFilter  = 'all';
+  let _payOrderId      = '';   // v3.5 目前開啟收款的訂單 ID
+  let _extraDeposits   = [];   // v3.5 額外（分期）訂金陣列
+  let _depInvoicePhoto = '';   // v3.5 訂金發票照片連結
+  let _finInvoicePhoto = '';   // v3.5 尾款發票照片連結
   let selectedStaff  = [];   // 目前選中的出勤人員陣列
   let _poolState     = {};   // 今日待命人力池 { 'YYYY-MM-DD': ['name',...] }，localStorage 持久化
 
@@ -1823,6 +1859,17 @@
   function showDetail(id) {
     const order = allOrders.find(o => String(o.id) === String(id));
     if (!order) return;
+    // v3.5 分期訂金 + 發票照片狀態
+    _payOrderId = id;
+    _extraDeposits = Array.isArray(order.extraDeposits)
+      ? order.extraDeposits.map(function (x) { return Object.assign({}, x); })
+      : [];
+    _depInvoicePhoto = order.depositInvoicePhoto || '';
+    _finInvoicePhoto = order.finalInvoicePhoto || '';
+    const depInvLink = _depInvoicePhoto
+      ? '<a class="invoice-photo-link" href="' + esc(_depInvoicePhoto) + '" target="_blank">已上傳✔ 檢視</a>' : '';
+    const finInvLink = _finInvoicePhoto
+      ? '<a class="invoice-photo-link" href="' + esc(_finInvoicePhoto) + '" target="_blank">已上傳✔ 檢視</a>' : '';
 
     const dt  = new Date(order.date + 'T00:00:00');
     const wd  = order.weekday || ['日','一','二','三','四','五','六'][dt.getDay()];
@@ -1925,14 +1972,27 @@
           <div class="payment-field"><label>金額</label><input type="number" id="pay-dep-amount" value="${esc(order.depositAmount)}" placeholder="例：5000"></div>
           <div class="payment-field"><label>預計付款日</label><input type="date" id="pay-dep-due" value="${esc(order.depositDueDate)}"></div>
           <div class="payment-field"><label>實際付款日</label><input type="date" id="pay-dep-paid" value="${esc(order.depositPaidDate)}"></div>
-          <div class="payment-field"><label>後五碼</label><input type="text" id="pay-dep-last5" value="${esc(order.depositLast5)}" placeholder="轉帳後五碼" maxlength="10"></div>
+          <div class="payment-field"><label>轉帳後五碼</label><input type="text" id="pay-dep-last5" value="${esc(order.depositLast5)}" placeholder="轉帳後五碼" maxlength="10"></div>
+          <div class="payment-field"><label>發票後五碼</label><input type="text" id="pay-dep-inv5" value="${esc(order.depositInvoice5)}" placeholder="滿屋銷項發票後五碼" maxlength="5" inputmode="numeric"></div>
+          <div class="payment-field"><label>發票拍照</label><div style="flex:1">
+            <label class="invoice-photo-btn">📷 拍照上傳<input type="file" accept="image/*" capture="environment" id="dep-invoice-file" style="display:none" onchange="handleInvoicePhoto(this,'deposit')"></label>
+            <span id="dep-invoice-link">${depInvLink}</span></div></div>
         </div>
+
+        <!-- v3.5 額外（分期）訂金 -->
+        <div id="extra-deposits-wrap"></div>
+        <button type="button" class="add-extra-dep-btn" onclick="addExtraDeposit()">＋ 新增其他筆訂金（分期付款）</button>
+
         <div class="payment-block">
           <div class="payment-block-title">💰 尾款</div>
           <div class="payment-field"><label>金額</label><input type="number" id="pay-fin-amount" value="${esc(order.finalAmount)}" placeholder="例：10000"></div>
           <div class="payment-field"><label>預計付款日</label><input type="date" id="pay-fin-due" value="${esc(order.finalDueDate)}"></div>
           <div class="payment-field"><label>實際付款日</label><input type="date" id="pay-fin-paid" value="${esc(order.finalPaidDate)}"></div>
-          <div class="payment-field"><label>後五碼</label><input type="text" id="pay-fin-last5" value="${esc(order.finalLast5)}" placeholder="轉帳後五碼" maxlength="10"></div>
+          <div class="payment-field"><label>轉帳後五碼</label><input type="text" id="pay-fin-last5" value="${esc(order.finalLast5)}" placeholder="轉帳後五碼" maxlength="10"></div>
+          <div class="payment-field"><label>發票後五碼</label><input type="text" id="pay-fin-inv5" value="${esc(order.finalInvoice5)}" placeholder="滿屋銷項發票後五碼" maxlength="5" inputmode="numeric"></div>
+          <div class="payment-field"><label>發票拍照</label><div style="flex:1">
+            <label class="invoice-photo-btn">📷 拍照上傳<input type="file" accept="image/*" capture="environment" id="fin-invoice-file" style="display:none" onchange="handleInvoicePhoto(this,'final')"></label>
+            <span id="fin-invoice-link">${finInvLink}</span></div></div>
         </div>
         <button class="payment-save-btn" onclick="savePayment('${esc(id)}')">💾 儲存收款資訊</button>
       </div>
@@ -1947,6 +2007,7 @@
     `;
 
     showScreen('detail-screen');
+    renderExtraDeposits();
     loadHistory(id);
     // 延遲一點再跳警告，讓畫面先渲染完
     setTimeout(() => checkStaffWarning(order), 400);
@@ -2635,15 +2696,21 @@
   //  收款資訊儲存
   // =====================================================
   async function savePayment(id) {
+    _collectExtraDeposits();
     const payment = {
       depositAmount:   document.getElementById('pay-dep-amount').value.trim(),
       depositDueDate:  document.getElementById('pay-dep-due').value,
       depositPaidDate: document.getElementById('pay-dep-paid').value,
       depositLast5:    document.getElementById('pay-dep-last5').value.trim(),
+      depositInvoice5: document.getElementById('pay-dep-inv5').value.trim(),
+      depositInvoicePhoto: _depInvoicePhoto,
       finalAmount:     document.getElementById('pay-fin-amount').value.trim(),
       finalDueDate:    document.getElementById('pay-fin-due').value,
       finalPaidDate:   document.getElementById('pay-fin-paid').value,
       finalLast5:      document.getElementById('pay-fin-last5').value.trim(),
+      finalInvoice5:   document.getElementById('pay-fin-inv5').value.trim(),
+      finalInvoicePhoto: _finInvoicePhoto,
+      extraDeposits:   _extraDeposits
     };
     showLoading(true, '儲存收款資訊...');
     try {
@@ -2659,6 +2726,112 @@
       showLoading(false);
       showToast('❌ 儲存失敗：' + err.message, 'error');
     }
+  }
+
+  // ── v3.5 分期訂金 + 發票拍照上傳 ──
+  function renderExtraDeposits() {
+    const wrap = document.getElementById('extra-deposits-wrap');
+    if (!wrap) return;
+    if (!_extraDeposits.length) { wrap.innerHTML = ''; return; }
+    wrap.innerHTML = _extraDeposits.map(function (d, i) {
+      const photoLink = d.invoicePhoto
+        ? `<a class="invoice-photo-link" href="${esc(d.invoicePhoto)}" target="_blank">已上傳✔ 檢視</a>` : '';
+      return `
+        <div class="extra-dep-card">
+          <div class="extra-dep-head"><span class="t">💵 額外訂金 #${i + 1}</span>
+            <button type="button" class="extra-dep-del" onclick="removeExtraDeposit(${i})">刪除</button></div>
+          <div class="payment-field"><label>金額</label><input type="number" value="${esc(d.amount || '')}" placeholder="例：5000"></div>
+          <div class="payment-field"><label>預計付款日</label><input type="date" value="${esc(d.dueDate || '')}"></div>
+          <div class="payment-field"><label>實際付款日</label><input type="date" value="${esc(d.paidDate || '')}"></div>
+          <div class="payment-field"><label>轉帳後五碼</label><input type="text" maxlength="10" value="${esc(d.transferLast5 || '')}" placeholder="轉帳後五碼"></div>
+          <div class="payment-field"><label>發票後五碼</label><input type="text" maxlength="5" inputmode="numeric" value="${esc(d.invoice5 || '')}" placeholder="銷項發票後五碼"></div>
+          <div class="payment-field"><label>發票拍照</label><div style="flex:1">
+            <label class="invoice-photo-btn">📷 拍照上傳<input type="file" accept="image/*" capture="environment" style="display:none" onchange="handleInvoicePhoto(this,'extra',${i})"></label>
+            <span id="extra-link-${i}">${photoLink}</span></div></div>
+        </div>`;
+    }).join('');
+  }
+
+  function addExtraDeposit() {
+    _collectExtraDeposits();
+    _extraDeposits.push({ amount:'', dueDate:'', paidDate:'', transferLast5:'', invoice5:'', invoicePhoto:'' });
+    renderExtraDeposits();
+  }
+
+  function removeExtraDeposit(i) {
+    _collectExtraDeposits();
+    _extraDeposits.splice(i, 1);
+    renderExtraDeposits();
+  }
+
+  // 重繪前先把目前各分期輸入框的值收回陣列，避免使用者輸入遺失
+  function _collectExtraDeposits() {
+    const wrap = document.getElementById('extra-deposits-wrap');
+    if (!wrap) return;
+    const cards = wrap.querySelectorAll('.extra-dep-card');
+    cards.forEach(function (card, i) {
+      if (!_extraDeposits[i]) return;
+      const ins = card.querySelectorAll('input');
+      // 順序：金額 / 預計 / 實際 / 轉帳後五碼 / 發票後五碼 /（file）
+      _extraDeposits[i].amount        = ins[0] ? ins[0].value : '';
+      _extraDeposits[i].dueDate       = ins[1] ? ins[1].value : '';
+      _extraDeposits[i].paidDate      = ins[2] ? ins[2].value : '';
+      _extraDeposits[i].transferLast5 = ins[3] ? ins[3].value : '';
+      _extraDeposits[i].invoice5      = ins[4] ? ins[4].value : '';
+    });
+  }
+
+  // 發票拍照 → 壓縮 → 上傳 Drive → 回填連結
+  async function handleInvoicePhoto(input, kind, idx) {
+    const file = input.files && input.files[0];
+    if (!file) return;
+    showLoading(true, '上傳發票照片中...');
+    try {
+      const dataUrl = await _shrinkImage(file, 1600, 0.7);
+      const body = { action:'uploadInvoicePhoto', code:PASSCODE, user:selectedUser,
+                     dataUrl: dataUrl, filename: (kind + '_發票') };
+      const res  = await fetch(API_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body:JSON.stringify(body) });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || '上傳失敗');
+      const link = '<a class="invoice-photo-link" href="' + esc(data.url) + '" target="_blank">已上傳✔ 檢視</a>';
+      if (kind === 'deposit') { _depInvoicePhoto = data.url; const el = document.getElementById('dep-invoice-link'); if (el) el.innerHTML = link; }
+      else if (kind === 'final') { _finInvoicePhoto = data.url; const el = document.getElementById('fin-invoice-link'); if (el) el.innerHTML = link; }
+      else if (kind === 'extra') {
+        _collectExtraDeposits();
+        if (_extraDeposits[idx]) _extraDeposits[idx].invoicePhoto = data.url;
+        const el = document.getElementById('extra-link-' + idx);
+        if (el) el.innerHTML = link;
+      }
+      showLoading(false);
+      showToast('✅ 發票已上傳（記得按「儲存收款資訊」）', 'success');
+    } catch (err) {
+      showLoading(false);
+      showToast('❌ ' + err.message, 'error');
+    }
+    input.value = '';
+  }
+
+  // 用 canvas 壓縮圖片成 JPEG dataURL，降低上傳量
+  function _shrinkImage(file, maxDim, quality) {
+    return new Promise(function (resolve, reject) {
+      const reader = new FileReader();
+      reader.onload = function (e) {
+        const img = new Image();
+        img.onload = function () {
+          let w = img.width, h = img.height;
+          if (w > h && w > maxDim) { h = Math.round(h * maxDim / w); w = maxDim; }
+          else if (h >= w && h > maxDim) { w = Math.round(w * maxDim / h); h = maxDim; }
+          const canvas = document.createElement('canvas');
+          canvas.width = w; canvas.height = h;
+          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+          resolve(canvas.toDataURL('image/jpeg', quality));
+        };
+        img.onerror = reject;
+        img.src = e.target.result;
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
   }
 
   // =====================================================
@@ -2691,6 +2864,24 @@
       const data = await res.json();
       if (!data.success) throw new Error(data.error || '讀取失敗');
       const fmt = n => `NT$ ${Number(n || 0).toLocaleString()}`;
+      const bt = data.byType || {};
+      const typeMeta = [
+        { key:'婚禮', icon:'💒', color:'#BE185D' },
+        { key:'商業', icon:'🏢', color:'#1D4ED8' },
+        { key:'其他', icon:'📦', color:'#92400E' }
+      ];
+      const typeCards = typeMeta.map(function (t) {
+        const o = bt[t.key] || { deposit:0, final:0 };
+        const sub = (o.deposit || 0) + (o.final || 0);
+        return `
+          <div class="finance-type-card" style="border-left:4px solid ${t.color}">
+            <div class="finance-type-head"><span>${t.icon} ${t.key}場</span><span class="finance-type-sum">${fmt(sub)}</span></div>
+            <div class="finance-type-row">
+              <span>💵 訂金 ${fmt(o.deposit)}</span>
+              <span>💰 尾款 ${fmt(o.final)}</span>
+            </div>
+          </div>`;
+      }).join('');
       el.innerHTML = `
         <div class="finance-summary-card">
           <div class="finance-summary-title">📅 ${y}年${m}月 · 店務收入合計</div>
@@ -2706,7 +2897,8 @@
             </div>
           </div>
         </div>
-        <p style="font-size:.78rem;color:var(--text-light);text-align:center;margin-top:.5rem">以本月所有場次的訂金與尾款金額加總計算</p>`;
+        <div style="margin-top:.75rem">${typeCards}</div>
+        <p style="font-size:.78rem;color:var(--text-light);text-align:center;margin-top:.5rem">依場次類型拆分；訂金已含分期訂金，人員休不計</p>`;
     } catch(err) {
       el.innerHTML = `<div style="text-align:center;padding:2rem;color:var(--danger)">載入失敗：${esc(err.message)}</div>`;
     }
@@ -2725,17 +2917,27 @@
         el.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--text-light)">本月尚無支出記錄<br><span style="font-size:.8rem">點右下角 ＋ 新增</span></div>';
         return;
       }
-      el.innerHTML = exps.map(ex => `
+      el.innerHTML = exps.map(ex => {
+        const amt = ex.amount ? 'NT$ ' + Number(String(ex.amount).replace(/[^0-9.]/g,'') || 0).toLocaleString() : '－';
+        const inv = ex.invoice5
+          ? '發票…' + esc(ex.invoice5) + (ex.invoiceToKid ? ' ✔已給Kid' : ' ⏳未給Kid')
+          : (ex.certType ? esc(ex.certType) : '無發票');
+        return `
         <div class="expense-card" onclick="editExpense('${esc(ex.id)}')">
           <div class="expense-card-row">
             <span class="expense-type">${esc(ex.type)}</span>
+            <span style="font-weight:800;color:#065F46">${amt}</span>
+          </div>
+          <div class="expense-meta">
+            付款人：${esc(ex.payer)} ｜ 實際支出：${esc(ex.payDate)}${ex.notes ? ' ｜ ' + esc(ex.notes) : ''}
+          </div>
+          <div class="expense-meta">🧾 ${inv}</div>
+          <div style="text-align:right;margin-top:.3rem">
             <button class="expense-delete-btn"
                     onclick="event.stopPropagation();deleteExpenseConfirm('${esc(ex.id)}','${esc(ex.type)}')">刪除</button>
           </div>
-          <div class="expense-meta">
-            付款人：${esc(ex.payer)} ｜ 日期：${esc(ex.payDate)}${ex.notes ? ' ｜ ' + esc(ex.notes) : ''}
-          </div>
-        </div>`).join('');
+        </div>`;
+      }).join('');
     } catch(err) {
       el.innerHTML = `<div style="text-align:center;padding:2rem;color:var(--danger)">載入失敗：${esc(err.message)}</div>`;
     }
@@ -2748,7 +2950,11 @@
     document.getElementById('ef-custom-wrap').style.display = 'none';
     document.getElementById('ef-custom-name').value = '';
     document.getElementById('ef-payer').value = selectedUser || 'Kevin';
+    document.getElementById('ef-amount').value = '';
     document.getElementById('ef-date').value = new Date().toISOString().slice(0, 10);
+    document.getElementById('ef-invoice-kid').checked = false;
+    document.getElementById('ef-invoice5').value = '';
+    document.getElementById('ef-cert-type').value = '';
     document.getElementById('ef-notes').value = '';
     document.getElementById('expense-modal').classList.remove('hidden');
   }
@@ -2767,7 +2973,11 @@
         document.getElementById('ef-custom-wrap').style.display = isCustom ? 'block' : 'none';
         document.getElementById('ef-custom-name').value   = isCustom ? ex.type : '';
         document.getElementById('ef-payer').value         = ex.payer;
+        document.getElementById('ef-amount').value        = ex.amount || '';
         document.getElementById('ef-date').value          = ex.payDate;
+        document.getElementById('ef-invoice-kid').checked = !!ex.invoiceToKid;
+        document.getElementById('ef-invoice5').value      = ex.invoice5 || '';
+        document.getElementById('ef-cert-type').value     = ex.certType || '';
         document.getElementById('ef-notes').value         = ex.notes;
         document.getElementById('expense-modal').classList.remove('hidden');
       })
@@ -2784,6 +2994,10 @@
     document.getElementById('ef-custom-wrap').style.display = v === '其他' ? 'block' : 'none';
   }
 
+  function onInvoiceKidChange() {
+    // 預留：勾選「發票已給Kid」時的提示切換（目前僅記錄狀態）
+  }
+
   async function submitExpense() {
     const typeRaw = document.getElementById('ef-type').value;
     const type    = typeRaw === '其他'
@@ -2791,8 +3005,13 @@
       : typeRaw;
     if (!type)    return showToast('請選擇支出類型', 'error');
     const payer   = document.getElementById('ef-payer').value;
+    const amount  = document.getElementById('ef-amount').value.trim();
+    if (!amount) return showToast('請輸入金額', 'error');
     const payDate = document.getElementById('ef-date').value;
-    if (!payDate) return showToast('請輸入付款日期', 'error');
+    if (!payDate) return showToast('請輸入實際支出日期', 'error');
+    const invoiceToKid = document.getElementById('ef-invoice-kid').checked;
+    const invoice5 = document.getElementById('ef-invoice5').value.trim();
+    const certType = document.getElementById('ef-cert-type').value;
     const notes   = document.getElementById('ef-notes').value.trim();
     const ym      = payDate.slice(0, 7);
 
@@ -2800,9 +3019,9 @@
     try {
       const body = _editingExpId
         ? { action:'updateExpense', code:PASSCODE, user:selectedUser, id:_editingExpId,
-            expense:{ type, payer, payDate, notes } }
+            expense:{ type, payer, payDate, notes, amount, invoiceToKid, invoice5, certType } }
         : { action:'addExpense',    code:PASSCODE, user:selectedUser,
-            expense:{ type, payer, payDate, notes, yearMonth:ym } };
+            expense:{ type, payer, payDate, notes, yearMonth:ym, amount, invoiceToKid, invoice5, certType } };
       const res  = await fetch(API_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body:JSON.stringify(body) });
       const data = await res.json();
       if (!data.success) throw new Error(data.error || '操作失敗');
