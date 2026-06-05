@@ -2870,21 +2870,33 @@
         { key:'商業場', icon:'🏢', color:'#1D4ED8' },
         { key:'其他',   icon:'📦', color:'#92400E' }
       ];
-      const typeCards = typeMeta.map(function (t) {
-        const o = bt[t.key] || { deposit:0, final:0 };
+      const card = function (o, t, depLabel, finLabel) {
         const sub = (o.deposit || 0) + (o.final || 0);
         return `
           <div class="finance-type-card" style="border-left:4px solid ${t.color}">
             <div class="finance-type-head"><span>${t.icon} ${t.key}</span><span class="finance-type-sum">${fmt(sub)}</span></div>
             <div class="finance-type-row">
-              <span>💵 訂金 ${fmt(o.deposit)}</span>
-              <span>💰 尾款 ${fmt(o.final)}</span>
+              <span>${depLabel} ${fmt(o.deposit)}</span>
+              <span>${finLabel} ${fmt(o.final)}</span>
             </div>
           </div>`;
+      };
+      // ① 帳面營收（依場次月份）— 含其他場
+      const typeCards = typeMeta.map(function (t) {
+        return card(bt[t.key] || { deposit:0, final:0 }, t, '💵 訂金', '💰 尾款');
+      }).join('');
+      // ② 本月實際入帳現金流（依實際付款日）— Lulu 指定只看婚禮場 / 商業場
+      const abt = data.actualByType || {};
+      const actualMeta = [
+        { key:'婚禮場', icon:'💒', color:'#BE185D' },
+        { key:'商業場', icon:'🏢', color:'#1D4ED8' }
+      ];
+      const actualCards = actualMeta.map(function (t) {
+        return card(abt[t.key] || { deposit:0, final:0 }, t, '💵 實際入帳訂金', '💰 實際入帳尾款');
       }).join('');
       el.innerHTML = `
         <div class="finance-summary-card">
-          <div class="finance-summary-title">📅 ${y}年${m}月 · 店務收入合計</div>
+          <div class="finance-summary-title">📅 ${y}年${m}月 · 帳面營收合計</div>
           <div class="finance-summary-amount">${fmt(data.grandTotal)}</div>
           <div class="finance-summary-row">
             <div class="finance-summary-sub">
@@ -2897,8 +2909,31 @@
             </div>
           </div>
         </div>
-        <div style="margin-top:.75rem">${typeCards}</div>
-        <p style="font-size:.78rem;color:var(--text-light);text-align:center;margin-top:.5rem">依場次類型拆分；訂金已含分期訂金，人員休不計</p>`;
+        <div style="font-size:.8rem;font-weight:700;color:var(--text-mid);margin:.85rem .15rem .4rem">📊 帳面營收 · 依場次月份（看營收 YoY）</div>
+        <div>${typeCards}</div>
+
+        <div class="finance-summary-card" style="background:linear-gradient(135deg,#065F46,#047857);margin-top:1.1rem">
+          <div class="finance-summary-title">💵 ${y}年${m}月 · 本月實際入帳現金流</div>
+          <div class="finance-summary-amount">${fmt(data.actualGrandTotal)}</div>
+          <div class="finance-summary-row">
+            <div class="finance-summary-sub">
+              <div class="finance-sub-label">實際入帳訂金</div>
+              <div class="finance-sub-amount">${fmt(data.actualDepositTotal)}</div>
+            </div>
+            <div class="finance-summary-sub">
+              <div class="finance-sub-label">實際入帳尾款</div>
+              <div class="finance-sub-amount">${fmt(data.actualFinalTotal)}</div>
+            </div>
+          </div>
+        </div>
+        <div style="font-size:.8rem;font-weight:700;color:var(--text-mid);margin:.85rem .15rem .4rem">💵 本月實際入帳 · 依實際付款日</div>
+        <div>${actualCards}</div>
+
+        <p style="font-size:.74rem;color:var(--text-light);margin-top:.7rem;line-height:1.6">
+          📊 <b>帳面營收</b>：訂單的「場次月份」落在本月就整筆計入（不論款項何時收到），給總監看營收成長 YoY。<br>
+          💵 <b>實際入帳現金流</b>：依每筆訂金/尾款 PM 填的「實際付款日」歸月，反映本月真正進帳的現金。<br>
+          訂金已含分期訂金；人員休不計。
+        </p>`;
     } catch(err) {
       el.innerHTML = `<div style="text-align:center;padding:2rem;color:var(--danger)">載入失敗：${esc(err.message)}</div>`;
     }
