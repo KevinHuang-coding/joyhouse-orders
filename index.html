@@ -1265,7 +1265,7 @@
         document.getElementById('pin-error').textContent = '';
         showLoading(false);
         // 財務頁按鈕：只對有權限的四人顯示
-        const FINANCE_USERS = ['Kevin', 'Lulu', 'Kid', 'Pei-ying'];
+        const FINANCE_USERS = ['Kevin', 'Lulu', 'Kid'];
         const finBtn = document.getElementById('finance-nav-btn');
         if (finBtn) finBtn.style.display = FINANCE_USERS.includes(selectedUser) ? 'flex' : 'none';
         showScreen('main-screen');
