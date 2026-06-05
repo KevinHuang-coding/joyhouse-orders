@@ -2445,6 +2445,14 @@
     await _assignToOrder(name, orderId, date);
   }
 
+  /** 將訂單的出勤人員名單寫回後端（移除/調整人員用）；回傳是否成功 */
+  async function _patchStaff(orderId, order, staffStr) {
+    const body = { action:'updateOrder', code:PASSCODE, user:selectedUser, id:orderId, order:{ staff: staffStr } };
+    const res  = await fetch(API_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body:JSON.stringify(body) });
+    const data = await res.json();
+    return !!data.success;
+  }
+
   async function _assignToOrder(name, orderId, date) {
     const order = allOrders.find(o => String(o.id) === String(orderId));
     if (!order) return;
@@ -2463,6 +2471,7 @@
       const res  = await fetch(API_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body:JSON.stringify(body) });
       const data = await res.json();
       if (!data.success) throw new Error(data.error);
+      _syncPoolDateToGAS(date); // 指派後刷新大表【待命人力】行（移除已指派者）
       showToast(`✅ ${name} 已加入出勤`, 'success');
     } catch(err) {
       order.staff = oldStaff;
