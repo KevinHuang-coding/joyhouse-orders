@@ -747,6 +747,54 @@
       .modal-sheet { max-width:720px; }
       .fab, .finance-fab { right: calc(50% - 400px + 1.25rem); }
     }
+
+    /* ===== 桌機 master-detail 雙欄（v3.9）≥1024px ===== */
+    @media (min-width: 1024px) {
+      html { font-size: 17px; }
+      /* split 模式：左列表 + 右詳情 並排（覆蓋 A 版的窄欄置中）*/
+      body.dt-split {
+        max-width: 1280px;
+        display: grid;
+        grid-template-columns: 460px minmax(0, 1fr);
+        align-items: stretch;
+        min-height: 100dvh;
+      }
+      /* split 時 main 與 detail 同時顯示，忽略 .active 互斥 */
+      body.dt-split #main-screen,
+      body.dt-split #detail-screen {
+        display: flex !important;
+        height: 100dvh;
+        overflow: hidden;
+      }
+      body.dt-split #main-screen { border-right: 1px solid var(--border); }
+      /* split 時隱藏其餘畫面，避免殘留 */
+      body.dt-split #add-screen,
+      body.dt-split #finance-screen,
+      body.dt-split #login-screen,
+      body.dt-split #setup-screen { display: none !important; }
+      /* 左右欄各自捲動 */
+      body.dt-split #main-screen .orders-list,
+      body.dt-split #detail-screen .detail-body { overflow-y: auto; }
+      /* 桌機並排時詳情返回鈕無用 → 隱藏 */
+      body.dt-split #detail-screen .back-btn { display: none; }
+      /* 選取中的卡片高亮 */
+      body.dt-split .order-card.selected {
+        outline: 2px solid var(--primary);
+        outline-offset: 1px;
+        box-shadow: 0 0 0 4px rgba(196,134,10,.14);
+      }
+      /* 「＋ 新增場次」FAB 貼齊左列表欄右下，而非整螢幕右緣 */
+      body.dt-split #main-screen .fab {
+        right: auto;
+        left: max(1.25rem, calc(50% - 640px + 460px - 3.25rem - 1.25rem));
+      }
+      /* 右欄未選取時的空狀態 */
+      .detail-empty {
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        height: 100%; gap: .75rem; padding: 2rem; text-align: center;
+        color: var(--text-light); font-size: 1rem; font-weight: 600;
+      }
+    }
   </style>
 </head>
 <body>
@@ -1029,7 +1077,7 @@
     <button class="back-btn" onclick="showMain()">‹</button>
     <h2>📋 場次詳情</h2>
   </div>
-  <div class="detail-body" id="detail-body"></div>
+  <div class="detail-body" id="detail-body"><div class="detail-empty">👈 從左側選擇一筆場次查看詳情</div></div>
 </div>
 
 <!-- ===== FINANCE SCREEN ===== -->
@@ -1193,11 +1241,30 @@
   });
 
   // ---------- Screen ----------
+  // ── v3.9 桌機 master-detail 輔助 ──
+  function _isDesktop() { return window.matchMedia('(min-width:1024px)').matches; }
+  function _highlightSelectedCard(id) {
+    document.querySelectorAll('.order-card.selected').forEach(c => c.classList.remove('selected'));
+    if (!id) return;
+    const card = document.querySelector('.order-card[data-order-id="' + String(id).replace(/"/g, '\\"') + '"]');
+    if (card) card.classList.add('selected');
+  }
+
   function showScreen(id) {
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
     document.getElementById(id).classList.add('active');
+    // 桌機 master-detail：main(列表)＋detail(詳情) 並排雙欄；其餘畫面維持全螢幕
+    const split = _isDesktop() && (id === 'main-screen' || id === 'detail-screen');
+    document.body.classList.toggle('dt-split', split);
     window.scrollTo(0, 0);
   }
+
+  // 視窗縮放時，於 list/detail 情境同步 split 狀態（桌機↔手機切換）
+  window.addEventListener('resize', function () {
+    const mainActive   = document.getElementById('main-screen').classList.contains('active');
+    const detailActive = document.getElementById('detail-screen').classList.contains('active');
+    if (mainActive || detailActive) document.body.classList.toggle('dt-split', _isDesktop());
+  });
 
   function showMain() {
     showScreen('main-screen');
@@ -2043,6 +2110,8 @@
     renderExtraDeposits();
     renderOrderExpenses();
     loadHistory(id);
+    _highlightSelectedCard(id);
+    const _db = document.getElementById('detail-body'); if (_db) _db.scrollTop = 0;
     // 延遲一點再跳警告，讓畫面先渲染完
     setTimeout(() => checkStaffWarning(order), 400);
   }
@@ -2420,7 +2489,7 @@
             </div>`;
 
     return `
-      <div class="order-card ${cardClass}" onclick="showDetail('${esc(String(order.id))}')">
+      <div class="order-card ${cardClass}" data-order-id="${esc(String(order.id))}" onclick="showDetail('${esc(String(order.id))}')">
         <div class="order-date-badge">
           <div class="order-date-num">${day}</div>
           <div class="order-date-month">${mon}月</div>
