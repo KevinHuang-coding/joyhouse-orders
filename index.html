@@ -748,10 +748,20 @@
       .fab, .finance-fab { right: calc(50% - 400px + 1.25rem); }
     }
 
-    /* ===== 桌機 master-detail 雙欄（v3.9）≥1024px ===== */
+    /* v4.0 財務區塊標頭 + 新增鈕 */
+    .finance-block-head { display:flex; align-items:center; justify-content:space-between; gap:.5rem; margin:.2rem .15rem .5rem; }
+    .finance-block-add { background:#065F46; color:#fff; border:none; border-radius:.6rem; padding:.45rem .85rem; font-size:.8rem; font-weight:700; cursor:pointer; white-space:nowrap; }
+    .finance-block-add:active { transform:scale(.96); }
+    /* v4.0 訂單成本支出 選單 */
+    .oc-pick-field { margin:.2rem 0 1rem; }
+    .oc-pick-field label { display:block; font-size:.82rem; font-weight:700; color:var(--text-mid); margin-bottom:.4rem; }
+    .oc-select { width:100%; padding:.7rem .8rem; border:2px solid var(--border); border-radius:.7rem; font-size:.9rem; background:var(--bg); color:var(--text); outline:none; }
+    .oc-select:focus { border-color:var(--primary-light); background:#fff; }
+    .oc-order-banner { background:#FFF7ED; border:1px solid #FDBA74; border-radius:.7rem; padding:.6rem .8rem; font-size:.86rem; font-weight:600; margin-bottom:.8rem; }
+
+    /* ===== 桌機 master-detail 雙欄（v4.0：左列表＋右側多畫面）≥1024px ===== */
     @media (min-width: 1024px) {
       html { font-size: 17px; }
-      /* split 模式：左列表 + 右詳情 並排（覆蓋 A 版的窄欄置中）*/
       body.dt-split {
         max-width: 1280px;
         display: grid;
@@ -759,36 +769,42 @@
         align-items: stretch;
         min-height: 100dvh;
       }
-      /* split 時 main 與 detail 同時顯示，忽略 .active 互斥 */
-      body.dt-split #main-screen,
-      body.dt-split #detail-screen {
-        display: flex !important;
-        height: 100dvh;
-        overflow: hidden;
+      /* 左欄永遠是場次列表 */
+      body.dt-split #main-screen {
+        display: flex !important; grid-column: 1; grid-row: 1;
+        height: 100dvh; overflow: hidden; border-right: 1px solid var(--border);
       }
-      body.dt-split #main-screen { border-right: 1px solid var(--border); }
-      /* split 時隱藏其餘畫面，避免殘留 */
+      /* 右欄：依 data-right 顯示對應畫面（詳情/財務/訂單成本/入帳明細）*/
+      body.dt-split[data-right="detail-screen"]        #detail-screen,
+      body.dt-split[data-right="finance-screen"]       #finance-screen,
+      body.dt-split[data-right="order-cost-screen"]    #order-cost-screen,
+      body.dt-split[data-right="income-detail-screen"] #income-detail-screen {
+        display: flex !important; grid-column: 2; grid-row: 1; height: 100dvh; overflow: hidden;
+      }
+      /* split 時隱藏其餘畫面 */
       body.dt-split #add-screen,
-      body.dt-split #finance-screen,
       body.dt-split #login-screen,
       body.dt-split #setup-screen { display: none !important; }
-      /* 左右欄各自捲動 */
+      /* 各欄自身捲動 */
       body.dt-split #main-screen .orders-list,
-      body.dt-split #detail-screen .detail-body { overflow-y: auto; }
-      /* 桌機並排時詳情返回鈕無用 → 隱藏 */
-      body.dt-split #detail-screen .back-btn { display: none; }
+      body.dt-split #detail-screen .detail-body,
+      body.dt-split #finance-screen .finance-content,
+      body.dt-split #order-cost-screen .detail-body,
+      body.dt-split #income-detail-screen .detail-body { overflow-y: auto; }
+      /* 詳情/財務在桌機並排時返回鈕無用 → 隱藏；訂單成本/入帳明細需返回財務 → 保留 */
+      body.dt-split #detail-screen .back-btn,
+      body.dt-split #finance-screen .back-btn { display: none; }
       /* 選取中的卡片高亮 */
       body.dt-split .order-card.selected {
-        outline: 2px solid var(--primary);
-        outline-offset: 1px;
+        outline: 2px solid var(--primary); outline-offset: 1px;
         box-shadow: 0 0 0 4px rgba(196,134,10,.14);
       }
-      /* 「＋ 新增場次」FAB 貼齊左列表欄右下，而非整螢幕右緣 */
+      /* 「＋ 新增場次」FAB 貼齊左列表欄右下 */
       body.dt-split #main-screen .fab {
-        right: auto;
-        left: max(1.25rem, calc(50% - 640px + 460px - 3.25rem - 1.25rem));
+        right: auto; left: max(1.25rem, calc(50% - 640px + 460px - 3.25rem - 1.25rem));
       }
-      /* 右欄未選取時的空狀態 */
+      /* 財務頁右下角 FAB 在桌機隱藏（改用區塊內按鈕）*/
+      body.dt-split #finance-screen .finance-fab { display: none; }
       .detail-empty {
         display: flex; flex-direction: column; align-items: center; justify-content: center;
         height: 100%; gap: .75rem; padding: 2rem; text-align: center;
@@ -1094,11 +1110,29 @@
   <button class="finance-fab" id="finance-add-fab" onclick="showAddExpenseModal()" style="display:none">＋</button>
 </div>
 
+<!-- ===== 訂單成本支出 輸入頁（v4.0）===== -->
+<div class="screen" id="order-cost-screen">
+  <div class="sub-header">
+    <button class="back-btn" onclick="backFromOrderCost()">‹</button>
+    <h2>🧾 訂單成本支出</h2>
+  </div>
+  <div class="detail-body" id="order-cost-body"></div>
+</div>
+
+<!-- ===== 入帳明細頁（v4.0）===== -->
+<div class="screen" id="income-detail-screen">
+  <div class="sub-header">
+    <button class="back-btn" onclick="backFromIncomeDetail()">‹</button>
+    <h2 id="income-detail-title">入帳明細</h2>
+  </div>
+  <div class="detail-body" id="income-detail-body"></div>
+</div>
+
 <!-- ===== EXPENSE FORM MODAL ===== -->
 <div class="modal-overlay hidden" id="expense-modal">
   <div class="modal-sheet">
     <div class="modal-header">
-      <div class="modal-title" id="expense-modal-title">💰 新增店務支出</div>
+      <div class="modal-title" id="expense-modal-title">💰 新增店務雜項支出</div>
       <button class="modal-close" onclick="closeExpenseModal()">✕</button>
     </div>
     <div class="modal-scroll" style="padding:1rem">
@@ -1250,20 +1284,29 @@
     if (card) card.classList.add('selected');
   }
 
+  const RIGHT_SCREENS = ['detail-screen','finance-screen','order-cost-screen','income-detail-screen'];
   function showScreen(id) {
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
     document.getElementById(id).classList.add('active');
-    // 桌機 master-detail：main(列表)＋detail(詳情) 並排雙欄；其餘畫面維持全螢幕
-    const split = _isDesktop() && (id === 'main-screen' || id === 'detail-screen');
+    const isRight = RIGHT_SCREENS.indexOf(id) >= 0;
+    const split = _isDesktop() && (id === 'main-screen' || isRight);
     document.body.classList.toggle('dt-split', split);
+    if (split) {
+      if (isRight) {
+        document.body.setAttribute('data-right', id);
+        document.getElementById('main-screen').classList.add('active'); // 左欄維持列表
+      } else if (!document.body.getAttribute('data-right')) {
+        document.body.setAttribute('data-right', 'detail-screen'); // 預設右欄＝詳情(空狀態)
+      }
+    }
     window.scrollTo(0, 0);
   }
 
-  // 視窗縮放時，於 list/detail 情境同步 split 狀態（桌機↔手機切換）
+  // 視窗縮放時，於 list/右側畫面情境同步 split 狀態（桌機↔手機切換）
   window.addEventListener('resize', function () {
-    const mainActive   = document.getElementById('main-screen').classList.contains('active');
-    const detailActive = document.getElementById('detail-screen').classList.contains('active');
-    if (mainActive || detailActive) document.body.classList.toggle('dt-split', _isDesktop());
+    const anyActive = ['main-screen'].concat(RIGHT_SCREENS)
+      .some(function (id) { return document.getElementById(id).classList.contains('active'); });
+    if (anyActive) document.body.classList.toggle('dt-split', _isDesktop());
   });
 
   function showMain() {
@@ -1345,7 +1388,7 @@
   async function verifyPin() {
     showLoading(true, '驗證中...');
     try {
-      const res  = await fetch(API_URL + '?action=verify&code=' + currentPin);
+      const res  = await fetch(API_URL + '?action=verify&code=' + currentPin + '&user=' + encodeURIComponent(selectedUser));
       const data = await res.json();
       if (data.success) {
         PASSCODE = currentPin;
@@ -1353,15 +1396,14 @@
         updatePinDisplay();
         document.getElementById('pin-error').textContent = '';
         showLoading(false);
-        // 財務頁按鈕：只對有權限的四人顯示
-        const FINANCE_USERS = ['Kevin', 'Lulu', 'Kid'];
+        // 財務頁按鈕：依後端 finance 旗標（PIN 已綁定帳號，防共用碼點錯名字）
         const finBtn = document.getElementById('finance-nav-btn');
-        if (finBtn) finBtn.style.display = FINANCE_USERS.includes(selectedUser) ? 'flex' : 'none';
+        if (finBtn) finBtn.style.display = data.finance ? 'flex' : 'none';
         showScreen('main-screen');
         updateMonthTitle();
         await refreshOrders();
       } else {
-        pinError('驗證碼錯誤，請重試');
+        pinError('驗證碼錯誤，請確認已點選正確帳號');
         showLoading(false);
       }
     } catch (e) { pinError('連線失敗，請確認網路'); showLoading(false); }
@@ -2091,7 +2133,7 @@
 
       <!-- v3.7 訂單支出發票紀錄 -->
       <div class="payment-section" style="background:#FFF7ED;border-color:#FDBA74">
-        <div class="payment-section-title" style="color:#9A3412">🧾 訂單支出發票紀錄</div>
+        <div class="payment-section-title" style="color:#9A3412">🧾 訂單成本支出</div>
         <div id="order-expenses-wrap"></div>
         <button type="button" class="add-extra-dep-btn" onclick="addOrderExpense()">＋ 新增一筆訂單支出</button>
         <button class="payment-save-btn" onclick="saveOrderExpenses('${esc(id)}')">💾 儲存訂單支出發票</button>
@@ -2971,6 +3013,11 @@
         if (ord) body.subfolder = (ord.clientName || '未命名') + '_' + (ord.date || '');
         body.filename = '訂單支出_發票';
       }
+      if (kind === 'occost') {
+        const ord = _ocAllOrders.find(o => String(o.id) === String(_ocOrderId));
+        if (ord) body.subfolder = (ord.clientName || '未命名') + '_' + (ord.date || '');
+        body.filename = '訂單成本_發票';
+      }
       const res  = await fetch(API_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body:JSON.stringify(body) });
       const data = await res.json();
       if (!data.success) throw new Error(data.error || '上傳失敗');
@@ -2987,6 +3034,12 @@
         _collectOrderExpenses();
         if (_orderExpenses[idx]) _orderExpenses[idx].photo = data.url;
         const el = document.getElementById('orderexp-link-' + idx);
+        if (el) el.innerHTML = link;
+      }
+      else if (kind === 'occost') {
+        _collectOrderCost();
+        if (_ocExpenses[idx]) _ocExpenses[idx].photo = data.url;
+        const el = document.getElementById('occost-link-' + idx);
         if (el) el.innerHTML = link;
       }
       showLoading(false);
@@ -3026,6 +3079,10 @@
   // =====================================================
   let _financeTab     = 'income';
   let _editingExpId   = null;
+  let _incomeData     = null;   // v4.0 暫存本月收入資料（給入帳明細頁用）
+  let _ocAllOrders    = [];     // v4.0 訂單成本支出：全部訂單快取
+  let _ocOrderId      = '';     // v4.0 目前選取訂單
+  let _ocExpenses     = [];     // v4.0 目前訂單的成本支出陣列
 
   function showFinanceScreen() {
     _financeTab = 'income';
@@ -3037,7 +3094,7 @@
     _financeTab = tab;
     document.getElementById('tab-income').classList.toggle('active', tab === 'income');
     document.getElementById('tab-expense').classList.toggle('active', tab === 'expense');
-    document.getElementById('finance-add-fab').style.display = tab === 'expense' ? 'flex' : 'none';
+    document.getElementById('finance-add-fab').style.display = 'none';
     if (tab === 'income') loadIncome();
     else loadExpense();
   }
@@ -3050,6 +3107,7 @@
       const res  = await fetch(`${API_URL}?action=getMonthlyIncome&code=${PASSCODE}&year=${y}&month=${m}&user=${encodeURIComponent(selectedUser)}`);
       const data = await res.json();
       if (!data.success) throw new Error(data.error || '讀取失敗');
+      _incomeData = data;
       const fmt = n => `NT$ ${Number(n || 0).toLocaleString()}`;
       const bt = data.byType || {};
       const typeMeta = [
@@ -3115,6 +3173,10 @@
         </div>
         <div style="font-size:.8rem;font-weight:700;color:var(--text-mid);margin:.85rem .15rem .4rem">💵 本月實際入帳 · 依實際付款日</div>
         <div>${actualCards}</div>
+        <div style="display:flex;gap:.5rem;margin:.6rem .15rem 0">
+          <button class="finance-block-add" style="flex:1;background:#065F46" onclick="showIncomeDetail('deposit')">📋 查看各筆訂金明細</button>
+          <button class="finance-block-add" style="flex:1;background:#047857" onclick="showIncomeDetail('final')">📋 查看各筆尾款明細</button>
+        </div>
 
         <p style="font-size:.74rem;color:var(--text-light);margin-top:.7rem;line-height:1.6">
           📊 <b>帳面營收</b>：訂單的「場次月份」落在本月就整筆計入（不論款項何時收到），給總監看營收成長 YoY。<br>
@@ -3163,7 +3225,7 @@
                     onclick="event.stopPropagation();deleteExpenseConfirm('${esc(ex.id)}','${esc(ex.type)}')">刪除</button>
           </div>
         </div>`;
-      }).join('') : '<div style="text-align:center;padding:1rem;color:var(--text-light);font-size:.85rem">本月尚無店務支出</div>';
+      }).join('') : '<div style="text-align:center;padding:1rem;color:var(--text-light);font-size:.85rem">本月尚無店務雜項支出</div>';
 
       // ② 訂單支出發票（來源：訂單編輯區同步）
       const orderCards = oexps.length ? oexps.map(ex => {
@@ -3171,7 +3233,7 @@
         const photo = ex.photo ? ` ｜ <a href="${esc(ex.photo)}" target="_blank" style="color:#9A3412" onclick="event.stopPropagation()">🧾檢視發票</a>` : '';
         const inv = ex.invoice5 ? '發票…' + esc(ex.invoice5) : '無發票後五碼';
         return `
-        <div class="expense-card" style="border-left:4px solid #FB923C" onclick="openOrderFromExpense('${esc(ex.orderId)}')">
+        <div class="expense-card" style="border-left:4px solid #FB923C" onclick="editOrderCost('${esc(ex.orderId)}')">
           <div class="expense-card-row">
             <span class="expense-type">${esc(ex.desc) || '（未填品項）'}</span>
             <span style="font-weight:800;color:#9A3412">${amt}</span>
@@ -3181,19 +3243,25 @@
           </div>
           <div class="expense-meta">🧾 ${inv}${photo}</div>
         </div>`;
-      }).join('') : '<div style="text-align:center;padding:1rem;color:var(--text-light);font-size:.85rem">本月尚無訂單支出發票</div>';
+      }).join('') : '<div style="text-align:center;padding:1rem;color:var(--text-light);font-size:.85rem">本月尚無訂單成本支出</div>';
 
       el.innerHTML = `
-        <div style="font-size:.85rem;font-weight:800;color:var(--text-mid);margin:.2rem .15rem .5rem">🏪 店務支出</div>
+        <div class="finance-block-head">
+          <span style="font-size:.9rem;font-weight:800;color:var(--text-mid)">🛒 店務雜項支出</span>
+          <button class="finance-block-add" onclick="showAddExpenseModal()">＋ 新增雜項</button>
+        </div>
         <div>${storeCards}</div>
         <div class="finance-type-card" style="border-left:4px solid #065F46;margin-top:.4rem">
-          <div class="finance-type-head"><span>🏪 店務支出小計</span><span class="finance-type-sum">${fmt(storeTotal)}</span></div>
+          <div class="finance-type-head"><span>🛒 店務雜項支出小計</span><span class="finance-type-sum">${fmt(storeTotal)}</span></div>
         </div>
 
-        <div style="font-size:.85rem;font-weight:800;color:#9A3412;margin:1.1rem .15rem .5rem">🧾 訂單支出發票紀錄<span style="font-weight:500;color:var(--text-light);font-size:.72rem">（自訂單編輯區同步）</span></div>
+        <div class="finance-block-head" style="margin-top:1.1rem">
+          <span style="font-size:.9rem;font-weight:800;color:#9A3412">🧾 訂單成本支出<span style="font-weight:500;color:var(--text-light);font-size:.72rem"> ·與訂單頁雙向同步</span></span>
+          <button class="finance-block-add" style="background:#9A3412" onclick="showOrderCostScreen()">＋ 新增成本</button>
+        </div>
         <div>${orderCards}</div>
         <div class="finance-type-card" style="border-left:4px solid #FB923C;margin-top:.4rem">
-          <div class="finance-type-head"><span>🧾 訂單支出小計</span><span class="finance-type-sum" style="color:#9A3412">${fmt(orderTotal)}</span></div>
+          <div class="finance-type-head"><span>🧾 訂單成本支出小計</span><span class="finance-type-sum" style="color:#9A3412">${fmt(orderTotal)}</span></div>
         </div>
 
         <div class="finance-summary-card" style="background:linear-gradient(135deg,#7C2D12,#9A3412);margin-top:1.1rem">
@@ -3201,11 +3269,11 @@
           <div class="finance-summary-amount">${fmt(grandTotal)}</div>
           <div class="finance-summary-row">
             <div class="finance-summary-sub">
-              <div class="finance-sub-label">🏪 店務支出</div>
+              <div class="finance-sub-label">🛒 店務雜項支出</div>
               <div class="finance-sub-amount">${fmt(storeTotal)}</div>
             </div>
             <div class="finance-summary-sub">
-              <div class="finance-sub-label">🧾 訂單支出</div>
+              <div class="finance-sub-label">🧾 訂單成本支出</div>
               <div class="finance-sub-amount">${fmt(orderTotal)}</div>
             </div>
           </div>
@@ -3222,9 +3290,172 @@
     else showToast('找不到對應訂單（可能不在目前月份的場次清單）', 'error');
   }
 
+  // ===== v4.0 訂單成本支出（財務頁新增/編輯，雙向同步訂單 col28）=====
+  function _ymShift(y, m, d) { m += d; if (m > 12) { m = 1; y++; } if (m < 1) { m = 12; y--; } return [y, m]; }
+  function _ymKey(y, m) { return y + '-' + String(m).padStart(2, '0'); }
+
+  async function showOrderCostScreen(preOrderId) {
+    showLoading(true, '載入訂單列表...');
+    try {
+      const res = await fetch(`${API_URL}?action=getAllOrders&code=${PASSCODE}`);
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || '讀取失敗');
+      _ocAllOrders = (data.orders || []).filter(o => o.eventType === '婚禮場' || o.eventType === '商業場');
+      showLoading(false);
+    } catch (err) { showLoading(false); showToast('❌ ' + err.message, 'error'); return; }
+
+    const pv = _ymShift(currentYear, currentMonth, -1);
+    const nx = _ymShift(currentYear, currentMonth, 1);
+    const groups = [
+      { label: '前一月訂單列表', key: _ymKey(pv[0], pv[1]) },
+      { label: '本月訂單列表',   key: _ymKey(currentYear, currentMonth) },
+      { label: '次一月訂單列表', key: _ymKey(nx[0], nx[1]) }
+    ];
+    const optsFor = key => _ocAllOrders
+      .filter(o => String(o.date).substring(0, 7) === key)
+      .sort((a, b) => String(a.date).localeCompare(String(b.date)))
+      .map(o => `<option value="${esc(String(o.id))}">${esc(o.date)} ${esc(o.clientName) || '（未命名）'}（${esc(o.eventType)}）</option>`).join('');
+    const optgroups = groups.map(g => {
+      const opts = optsFor(g.key);
+      return `<optgroup label="${g.label}">${opts || '<option disabled>（本月無婚禮/商業場）</option>'}</optgroup>`;
+    }).join('');
+
+    document.getElementById('order-cost-body').innerHTML = `
+      <div class="oc-pick-field">
+        <label>選擇訂單（僅取婚禮場 / 商業場）</label>
+        <select id="oc-order-select" class="oc-select" onchange="onOrderCostPick()">
+          <option value="">— 請選擇訂單 —</option>
+          ${optgroups}
+        </select>
+      </div>
+      <div id="oc-detail-area" style="display:none">
+        <div class="oc-order-banner" id="oc-order-banner"></div>
+        <div id="oc-expenses-wrap"></div>
+        <button type="button" class="add-extra-dep-btn" onclick="addOrderCostEntry()">＋ 新增一筆成本支出</button>
+        <button class="payment-save-btn" onclick="saveOrderCost()">💾 儲存訂單成本支出</button>
+      </div>`;
+
+    _ocOrderId = ''; _ocExpenses = [];
+    showScreen('order-cost-screen');
+    if (preOrderId) {
+      const sel = document.getElementById('oc-order-select');
+      if (sel) { sel.value = String(preOrderId); onOrderCostPick(); }
+    }
+  }
+
+  function editOrderCost(orderId) { showOrderCostScreen(orderId); }
+
+  function onOrderCostPick() {
+    const sel = document.getElementById('oc-order-select');
+    _ocOrderId = sel ? sel.value : '';
+    const area = document.getElementById('oc-detail-area');
+    if (!_ocOrderId) { if (area) area.style.display = 'none'; return; }
+    const ord = _ocAllOrders.find(o => String(o.id) === String(_ocOrderId));
+    _ocExpenses = (ord && Array.isArray(ord.orderExpenses)) ? ord.orderExpenses.map(x => Object.assign({}, x)) : [];
+    const banner = document.getElementById('oc-order-banner');
+    if (banner && ord) banner.innerHTML = `📋 ${esc(ord.clientName) || '（未命名）'}　${esc(ord.date)}　<span style="color:var(--text-light)">${esc(ord.eventType)}</span>`;
+    if (area) area.style.display = 'block';
+    renderOrderCostEntries();
+  }
+
+  function renderOrderCostEntries() {
+    const wrap = document.getElementById('oc-expenses-wrap');
+    if (!wrap) return;
+    if (!_ocExpenses.length) {
+      wrap.innerHTML = '<div style="font-size:.82rem;color:var(--text-light);padding:.3rem 0 .6rem">尚無成本支出，點下方新增</div>';
+      return;
+    }
+    wrap.innerHTML = _ocExpenses.map(function (d, i) {
+      const photoLink = d.photo ? `<a class="invoice-photo-link" href="${esc(d.photo)}" target="_blank">已上傳✔ 檢視</a>` : '';
+      return `
+        <div class="extra-dep-card">
+          <div class="extra-dep-head"><span class="t">🧾 成本支出 #${i + 1}</span>
+            <button type="button" class="extra-dep-del" onclick="removeOrderCostEntry(${i})">刪除</button></div>
+          <div class="payment-field"><label>支出發票日期</label><input type="date" value="${esc(d.date || '')}"></div>
+          <div class="payment-field"><label>品項說明</label><input type="text" value="${esc(d.desc || '')}" placeholder="例：鮮花、氣球、外包工"></div>
+          <div class="payment-field"><label>金額</label><input type="number" value="${esc(d.amount || '')}" placeholder="例：3000"></div>
+          <div class="payment-field"><label>發票後五碼</label><input type="text" maxlength="5" inputmode="numeric" value="${esc(d.invoice5 || '')}" placeholder="選填"></div>
+          <div class="payment-field"><label>發票拍照</label><div style="flex:1">
+            <label class="invoice-photo-btn">📷 拍照上傳<input type="file" accept="image/*" capture="environment" style="display:none" onchange="handleInvoicePhoto(this,'occost',${i})"></label>
+            <span id="occost-link-${i}">${photoLink}</span></div></div>
+        </div>`;
+    }).join('');
+  }
+
+  function addOrderCostEntry() {
+    if (!_ocOrderId) { showToast('請先選擇訂單', 'error'); return; }
+    _collectOrderCost();
+    _ocExpenses.push({ date:'', desc:'', amount:'', invoice5:'', photo:'' });
+    renderOrderCostEntries();
+  }
+  function removeOrderCostEntry(i) { _collectOrderCost(); _ocExpenses.splice(i, 1); renderOrderCostEntries(); }
+  function _collectOrderCost() {
+    const wrap = document.getElementById('oc-expenses-wrap');
+    if (!wrap) return;
+    wrap.querySelectorAll('.extra-dep-card').forEach(function (card, i) {
+      if (!_ocExpenses[i]) return;
+      const ins = card.querySelectorAll('input');
+      _ocExpenses[i].date     = ins[0] ? ins[0].value : '';
+      _ocExpenses[i].desc     = ins[1] ? ins[1].value : '';
+      _ocExpenses[i].amount   = ins[2] ? ins[2].value : '';
+      _ocExpenses[i].invoice5 = ins[3] ? ins[3].value : '';
+    });
+  }
+
+  async function saveOrderCost() {
+    if (!_ocOrderId) { showToast('請先選擇訂單', 'error'); return; }
+    _collectOrderCost();
+    showLoading(true, '儲存訂單成本支出...');
+    try {
+      const body = { action:'updatePayment', code:PASSCODE, user:selectedUser, id:_ocOrderId, payment:{ orderExpenses: _ocExpenses } };
+      const res = await fetch(API_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body:JSON.stringify(body) });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || '儲存失敗');
+      const copy = _ocExpenses.map(x => Object.assign({}, x));
+      const oc = _ocAllOrders.find(o => String(o.id) === String(_ocOrderId)); if (oc) oc.orderExpenses = copy;
+      const ao = allOrders.find(o => String(o.id) === String(_ocOrderId)); if (ao) ao.orderExpenses = copy;
+      showLoading(false);
+      showToast('✅ 訂單成本支出已儲存', 'success');
+      backFromOrderCost();
+    } catch (err) { showLoading(false); showToast('❌ 儲存失敗：' + err.message, 'error'); }
+  }
+
+  function backFromOrderCost() { showScreen('finance-screen'); _financeTab = 'expense'; switchFinanceTab('expense'); }
+
+  // ===== v4.0 入帳明細頁 =====
+  function showIncomeDetail(kind) {
+    if (!_incomeData) { showToast('請先載入本月收入', 'error'); return; }
+    const list = kind === 'deposit' ? (_incomeData.actualDepositDetails || []) : (_incomeData.actualFinalDetails || []);
+    document.getElementById('income-detail-title').textContent =
+      `${currentYear}年${currentMonth}月 · 實際入帳${kind === 'deposit' ? '訂金' : '尾款'}明細`;
+    const fmt = n => 'NT$ ' + Number(n || 0).toLocaleString();
+    const total = list.reduce((a, e) => a + Number(e.amount || 0), 0);
+    const body = document.getElementById('income-detail-body');
+    if (!list.length) {
+      body.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--text-light)">本月此類別尚無入帳紀錄</div>';
+    } else {
+      body.innerHTML = `
+        <div class="finance-type-card" style="border-left:4px solid #065F46;margin-bottom:.6rem">
+          <div class="finance-type-head"><span>共 ${list.length} 筆 · 合計</span><span class="finance-type-sum">${fmt(total)}</span></div>
+        </div>` + list.map(function (e) {
+        const tag = e.eventType === '婚禮場' ? '💒' : e.eventType === '商業場' ? '🏢' : '📦';
+        return `
+        <div class="expense-card" onclick="openOrderFromExpense('${esc(e.orderId)}')">
+          <div class="expense-card-row">
+            <span class="expense-type">${tag} ${esc(e.orderName) || '（未命名）'}${e.extra ? ' （分期）' : ''}</span>
+            <span style="font-weight:800;color:#065F46">${fmt(e.amount)}</span>
+          </div>
+          <div class="expense-meta">匯款日：${esc(e.payDate) || '－'} ｜ 後五碼：${esc(e.last5) || '－'}</div>
+        </div>`;
+      }).join('');
+    }
+    showScreen('income-detail-screen');
+  }
+  function backFromIncomeDetail() { showScreen('finance-screen'); _financeTab = 'income'; switchFinanceTab('income'); }
+
   function showAddExpenseModal() {
     _editingExpId = null;
-    document.getElementById('expense-modal-title').textContent = '💰 新增店務支出';
+    document.getElementById('expense-modal-title').textContent = '💰 新增店務雜項支出';
     document.getElementById('ef-type').value = '';
     document.getElementById('ef-custom-wrap').style.display = 'none';
     document.getElementById('ef-custom-name').value = '';
@@ -3245,7 +3476,7 @@
         const ex = (data.expenses || []).find(e => e.id === id);
         if (!ex) return showToast('找不到支出記錄', 'error');
         _editingExpId = id;
-        document.getElementById('expense-modal-title').textContent = '✏️ 修改店務支出';
+        document.getElementById('expense-modal-title').textContent = '✏️ 修改店務雜項支出';
         const fixedTypes = ['月租停車費','臨時停車費','網路費','電話費','電費','水費','機動PT薪資','耗材'];
         const isCustom = !fixedTypes.includes(ex.type);
         document.getElementById('ef-type').value          = isCustom ? '其他' : ex.type;
