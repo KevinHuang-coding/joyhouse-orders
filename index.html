@@ -3115,20 +3115,22 @@
         { key:'商業場', icon:'🏢', color:'#1D4ED8' },
         { key:'其他',   icon:'📦', color:'#92400E' }
       ];
-      const card = function (o, t, depLabel, finLabel) {
+      const card = function (o, t, depLabel, finLabel, detailKey) {
         const sub = (o.deposit || 0) + (o.final || 0);
+        const btn = detailKey ? `
+            <button class="finance-block-add" style="width:100%;margin-top:.55rem;background:${t.color}" onclick="showBookedDetail('${detailKey}')">\uD83D\uDCCB \u770B\u5404\u8A02\u55AE\u71DF\u6536\u660E\u7D30</button>` : '';
         return `
           <div class="finance-type-card" style="border-left:4px solid ${t.color}">
             <div class="finance-type-head"><span>${t.icon} ${t.key}</span><span class="finance-type-sum">${fmt(sub)}</span></div>
             <div class="finance-type-row">
               <span>${depLabel} ${fmt(o.deposit)}</span>
               <span>${finLabel} ${fmt(o.final)}</span>
-            </div>
+            </div>${btn}
           </div>`;
       };
       // ① 帳面營收（依場次月份）— 含其他場
       const typeCards = typeMeta.map(function (t) {
-        return card(bt[t.key] || { deposit:0, final:0 }, t, '💵 訂金', '💰 尾款');
+        return card(bt[t.key] || { deposit:0, final:0 }, t, '💵 訂金', '💰 尾款', t.key);
       }).join('');
       // ② 本月實際入帳現金流（依實際付款日）— Lulu 指定只看婚禮場 / 商業場
       const abt = data.actualByType || {};
@@ -3452,6 +3454,52 @@
     showScreen('income-detail-screen');
   }
   function backFromIncomeDetail() { showScreen('finance-screen'); _financeTab = 'income'; switchFinanceTab('income'); }
+
+  // v4.1 帳面營收 → 各訂單明細（純前台，資料源 allOrders，與後端 byType 同口徑）
+  function showBookedDetail(typeKey) {
+    const numv = v => Number(String(v || '').replace(/[^0-9.]/g, '') || 0);
+    const list = (allOrders || [])
+      .filter(o => o.eventType !== '人員休')
+      .filter(o => ((o.eventType === '婚禮場' || o.eventType === '商業場') ? o.eventType : '其他') === typeKey)
+      .map(o => {
+        let dep = numv(o.depositAmount);
+        (o.extraDeposits || []).forEach(x => { dep += numv(x.amount); });
+        return { id:o.id, name:o.clientName, date:o.date, deposit:dep, final:numv(o.finalAmount) };
+      })
+      .sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')));
+    const icon  = typeKey === '婚禮場' ? '💒' : typeKey === '商業場' ? '🏢' : '📦';
+    const color = typeKey === '婚禮場' ? '#BE185D' : typeKey === '商業場' ? '#1D4ED8' : '#92400E';
+    const fmt = n => 'NT$ ' + Number(n || 0).toLocaleString();
+    document.getElementById('income-detail-title').textContent =
+      `${currentYear}年${currentMonth}月 · ${icon} ${typeKey} 各訂單帳面營收明細`;
+    const depTotal = list.reduce((a, e) => a + e.deposit, 0);
+    const finTotal = list.reduce((a, e) => a + e.final, 0);
+    const body = document.getElementById('income-detail-body');
+    if (!list.length) {
+      body.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--text-light)">本月此類別尚無訂單</div>';
+    } else {
+      body.innerHTML = `
+        <div class="finance-summary-card" style="background:linear-gradient(135deg,${color},${color}dd);margin-bottom:.7rem">
+          <div class="finance-summary-title">${icon} ${typeKey} · 共 ${list.length} 筆訂單</div>
+          <div class="finance-summary-amount">${fmt(depTotal + finTotal)}</div>
+          <div class="finance-summary-row">
+            <div class="finance-summary-sub"><div class="finance-sub-label">💵 帳面訂金合計</div><div class="finance-sub-amount">${fmt(depTotal)}</div></div>
+            <div class="finance-summary-sub"><div class="finance-sub-label">💰 帳面尾款合計</div><div class="finance-sub-amount">${fmt(finTotal)}</div></div>
+          </div>
+        </div>` + list.map(function (e) {
+        return `
+        <div class="expense-card" style="border-left:4px solid ${color}" onclick="openOrderFromExpense('${esc(String(e.id))}')">
+          <div class="expense-card-row">
+            <span class="expense-type">${icon} ${esc(e.name) || '（未填客戶）'}</span>
+            <span style="font-weight:800;color:${color}">${fmt(e.deposit + e.final)}</span>
+          </div>
+          <div class="expense-meta">場次日期：${esc(e.date) || '－'}</div>
+          <div class="expense-meta">💵 帳面訂金 ${fmt(e.deposit)} ｜ 💰 帳面尾款 ${fmt(e.final)}</div>
+        </div>`;
+      }).join('');
+    }
+    showScreen('income-detail-screen');
+  }
 
   function showAddExpenseModal() {
     _editingExpId = null;
