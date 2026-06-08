@@ -1046,6 +1046,7 @@
           <option value="電費">電費</option>
           <option value="水費">水費</option>
           <option value="機動PT薪資">機動PT薪資</option>
+          <option value="耗材">耗材（詳細名稱請key在備註）</option>
           <option value="其他">其他 - 請手動輸入</option>
         </select>
         <div id="ef-custom-wrap" class="expense-custom-name" style="display:none">
@@ -1121,6 +1122,7 @@
   let _extraDeposits   = [];   // v3.5 額外（分期）訂金陣列
   let _depInvoicePhoto = '';   // v3.5 訂金發票照片連結
   let _finInvoicePhoto = '';   // v3.5 尾款發票照片連結
+  let _orderExpenses   = [];   // v3.7 訂單支出發票紀錄陣列
   let selectedStaff  = [];   // 目前選中的出勤人員陣列
   let _poolState     = {};   // 今日待命人力池 { 'YYYY-MM-DD': ['name',...] }，localStorage 持久化
 
@@ -1867,6 +1869,9 @@
       : [];
     _depInvoicePhoto = order.depositInvoicePhoto || '';
     _finInvoicePhoto = order.finalInvoicePhoto || '';
+    _orderExpenses = Array.isArray(order.orderExpenses)
+      ? order.orderExpenses.map(function (x) { return Object.assign({}, x); })
+      : [];
     const depInvLink = _depInvoicePhoto
       ? '<a class="invoice-photo-link" href="' + esc(_depInvoicePhoto) + '" target="_blank">已上傳✔ 檢視</a>' : '';
     const finInvLink = _finInvoicePhoto
@@ -1998,6 +2003,14 @@
         <button class="payment-save-btn" onclick="savePayment('${esc(id)}')">💾 儲存收款資訊</button>
       </div>
 
+      <!-- v3.7 訂單支出發票紀錄 -->
+      <div class="payment-section" style="background:#FFF7ED;border-color:#FDBA74">
+        <div class="payment-section-title" style="color:#9A3412">🧾 訂單支出發票紀錄</div>
+        <div id="order-expenses-wrap"></div>
+        <button type="button" class="add-extra-dep-btn" onclick="addOrderExpense()">＋ 新增一筆訂單支出</button>
+        <button class="payment-save-btn" onclick="saveOrderExpenses('${esc(id)}')">💾 儲存訂單支出發票</button>
+      </div>
+
       <div class="created-at">建立時間：${esc(order.createdAt) || '－'}</div>
       <button class="edit-btn" onclick="showEditOrder('${esc(id)}')">✏️ 編輯此場次訂單</button>
       <button class="delete-btn" onclick="confirmDelete('${esc(id)}')">🗑️ 刪除此場次訂單</button>
@@ -2009,6 +2022,7 @@
 
     showScreen('detail-screen');
     renderExtraDeposits();
+    renderOrderExpenses();
     loadHistory(id);
     // 延遲一點再跳警告，讓畫面先渲染完
     setTimeout(() => checkStaffWarning(order), 400);
@@ -2782,6 +2796,79 @@
     });
   }
 
+  // ── v3.7 訂單支出發票紀錄 ──
+  function renderOrderExpenses() {
+    const wrap = document.getElementById('order-expenses-wrap');
+    if (!wrap) return;
+    if (!_orderExpenses.length) {
+      wrap.innerHTML = '<div style="font-size:.82rem;color:var(--text-light);padding:.3rem 0 .6rem">尚無訂單支出，點下方按鈕新增</div>';
+      return;
+    }
+    wrap.innerHTML = _orderExpenses.map(function (d, i) {
+      const photoLink = d.photo
+        ? `<a class="invoice-photo-link" href="${esc(d.photo)}" target="_blank">已上傳✔ 檢視</a>` : '';
+      return `
+        <div class="extra-dep-card">
+          <div class="extra-dep-head"><span class="t">🧾 訂單支出 #${i + 1}</span>
+            <button type="button" class="extra-dep-del" onclick="removeOrderExpense(${i})">刪除</button></div>
+          <div class="payment-field"><label>支出發票日期</label><input type="date" value="${esc(d.date || '')}"></div>
+          <div class="payment-field"><label>品項說明</label><input type="text" value="${esc(d.desc || '')}" placeholder="例：鮮花、氣球、外包工"></div>
+          <div class="payment-field"><label>金額</label><input type="number" value="${esc(d.amount || '')}" placeholder="例：3000"></div>
+          <div class="payment-field"><label>發票後五碼</label><input type="text" maxlength="5" inputmode="numeric" value="${esc(d.invoice5 || '')}" placeholder="選填"></div>
+          <div class="payment-field"><label>發票拍照</label><div style="flex:1">
+            <label class="invoice-photo-btn">📷 拍照上傳<input type="file" accept="image/*" capture="environment" style="display:none" onchange="handleInvoicePhoto(this,'orderexp',${i})"></label>
+            <span id="orderexp-link-${i}">${photoLink}</span></div></div>
+        </div>`;
+    }).join('');
+  }
+
+  function addOrderExpense() {
+    _collectOrderExpenses();
+    _orderExpenses.push({ date:'', desc:'', amount:'', invoice5:'', photo:'' });
+    renderOrderExpenses();
+  }
+
+  function removeOrderExpense(i) {
+    _collectOrderExpenses();
+    _orderExpenses.splice(i, 1);
+    renderOrderExpenses();
+  }
+
+  // 重繪/儲存前先把各筆輸入框的值收回陣列，避免遺失
+  function _collectOrderExpenses() {
+    const wrap = document.getElementById('order-expenses-wrap');
+    if (!wrap) return;
+    const cards = wrap.querySelectorAll('.extra-dep-card');
+    cards.forEach(function (card, i) {
+      if (!_orderExpenses[i]) return;
+      const ins = card.querySelectorAll('input');
+      // 順序：支出發票日期 / 品項說明 / 金額 / 發票後五碼 /（file）
+      _orderExpenses[i].date     = ins[0] ? ins[0].value : '';
+      _orderExpenses[i].desc     = ins[1] ? ins[1].value : '';
+      _orderExpenses[i].amount   = ins[2] ? ins[2].value : '';
+      _orderExpenses[i].invoice5 = ins[3] ? ins[3].value : '';
+    });
+  }
+
+  async function saveOrderExpenses(id) {
+    _collectOrderExpenses();
+    showLoading(true, '儲存訂單支出...');
+    try {
+      const body = { action:'updatePayment', code:PASSCODE, user:selectedUser, id,
+                     payment:{ orderExpenses: _orderExpenses } };
+      const res  = await fetch(API_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body:JSON.stringify(body) });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || '儲存失敗');
+      const order = allOrders.find(o => String(o.id) === String(id));
+      if (order) order.orderExpenses = _orderExpenses.map(function (x) { return Object.assign({}, x); });
+      showLoading(false);
+      showToast('✅ 訂單支出已儲存', 'success');
+    } catch(err) {
+      showLoading(false);
+      showToast('❌ 儲存失敗：' + err.message, 'error');
+    }
+  }
+
   // 發票拍照 → 壓縮 → 上傳 Drive → 回填連結
   async function handleInvoicePhoto(input, kind, idx) {
     const file = input.files && input.files[0];
@@ -2791,6 +2878,11 @@
       const dataUrl = await _shrinkImage(file, 1600, 0.7);
       const body = { action:'uploadInvoicePhoto', code:PASSCODE, user:selectedUser,
                      dataUrl: dataUrl, filename: (kind + '_發票') };
+      if (kind === 'orderexp') {
+        const ord = allOrders.find(o => String(o.id) === String(_payOrderId));
+        if (ord) body.subfolder = (ord.clientName || '未命名') + '_' + (ord.date || '');
+        body.filename = '訂單支出_發票';
+      }
       const res  = await fetch(API_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body:JSON.stringify(body) });
       const data = await res.json();
       if (!data.success) throw new Error(data.error || '上傳失敗');
@@ -2801,6 +2893,12 @@
         _collectExtraDeposits();
         if (_extraDeposits[idx]) _extraDeposits[idx].invoicePhoto = data.url;
         const el = document.getElementById('extra-link-' + idx);
+        if (el) el.innerHTML = link;
+      }
+      else if (kind === 'orderexp') {
+        _collectOrderExpenses();
+        if (_orderExpenses[idx]) _orderExpenses[idx].photo = data.url;
+        const el = document.getElementById('orderexp-link-' + idx);
         if (el) el.innerHTML = link;
       }
       showLoading(false);
@@ -2948,13 +3046,17 @@
       const res  = await fetch(`${API_URL}?action=getExpenses&code=${PASSCODE}&year=${y}&month=${m}&user=${encodeURIComponent(selectedUser)}`);
       const data = await res.json();
       if (!data.success) throw new Error(data.error || '讀取失敗');
-      const exps = data.expenses || [];
-      if (!exps.length) {
-        el.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--text-light)">本月尚無支出記錄<br><span style="font-size:.8rem">點右下角 ＋ 新增</span></div>';
-        return;
-      }
-      el.innerHTML = exps.map(ex => {
-        const amt = ex.amount ? 'NT$ ' + Number(String(ex.amount).replace(/[^0-9.]/g,'') || 0).toLocaleString() : '－';
+      const exps  = data.expenses || [];
+      const oexps = data.orderExpenses || [];
+      const fmt = n => 'NT$ ' + Number(n || 0).toLocaleString();
+      const numv = v => Number(String(v || '').replace(/[^0-9.]/g,'') || 0);
+      const storeTotal = (data.storeTotal != null) ? data.storeTotal : exps.reduce((a,e)=>a+numv(e.amount),0);
+      const orderTotal = (data.orderTotal != null) ? data.orderTotal : oexps.reduce((a,e)=>a+numv(e.amount),0);
+      const grandTotal = (data.grandTotal != null) ? data.grandTotal : (storeTotal + orderTotal);
+
+      // ① 店務支出
+      const storeCards = exps.length ? exps.map(ex => {
+        const amt = ex.amount ? 'NT$ ' + numv(ex.amount).toLocaleString() : '－';
         const inv = ex.invoice5
           ? '發票…' + esc(ex.invoice5) + (ex.invoiceToKid ? ' ✔已給Kid' : ' ⏳未給Kid')
           : (ex.certType ? esc(ex.certType) : '無發票');
@@ -2973,10 +3075,63 @@
                     onclick="event.stopPropagation();deleteExpenseConfirm('${esc(ex.id)}','${esc(ex.type)}')">刪除</button>
           </div>
         </div>`;
-      }).join('');
+      }).join('') : '<div style="text-align:center;padding:1rem;color:var(--text-light);font-size:.85rem">本月尚無店務支出</div>';
+
+      // ② 訂單支出發票（來源：訂單編輯區同步）
+      const orderCards = oexps.length ? oexps.map(ex => {
+        const amt = ex.amount ? 'NT$ ' + numv(ex.amount).toLocaleString() : '－';
+        const photo = ex.photo ? ` ｜ <a href="${esc(ex.photo)}" target="_blank" style="color:#9A3412" onclick="event.stopPropagation()">🧾檢視發票</a>` : '';
+        const inv = ex.invoice5 ? '發票…' + esc(ex.invoice5) : '無發票後五碼';
+        return `
+        <div class="expense-card" style="border-left:4px solid #FB923C" onclick="openOrderFromExpense('${esc(ex.orderId)}')">
+          <div class="expense-card-row">
+            <span class="expense-type">${esc(ex.desc) || '（未填品項）'}</span>
+            <span style="font-weight:800;color:#9A3412">${amt}</span>
+          </div>
+          <div class="expense-meta">
+            訂單：${esc(ex.clientName) || '－'}（${esc(ex.orderDate)}）｜ 支出發票日：${esc(ex.date)}
+          </div>
+          <div class="expense-meta">🧾 ${inv}${photo}</div>
+        </div>`;
+      }).join('') : '<div style="text-align:center;padding:1rem;color:var(--text-light);font-size:.85rem">本月尚無訂單支出發票</div>';
+
+      el.innerHTML = `
+        <div style="font-size:.85rem;font-weight:800;color:var(--text-mid);margin:.2rem .15rem .5rem">🏪 店務支出</div>
+        <div>${storeCards}</div>
+        <div class="finance-type-card" style="border-left:4px solid #065F46;margin-top:.4rem">
+          <div class="finance-type-head"><span>🏪 店務支出小計</span><span class="finance-type-sum">${fmt(storeTotal)}</span></div>
+        </div>
+
+        <div style="font-size:.85rem;font-weight:800;color:#9A3412;margin:1.1rem .15rem .5rem">🧾 訂單支出發票紀錄<span style="font-weight:500;color:var(--text-light);font-size:.72rem">（自訂單編輯區同步）</span></div>
+        <div>${orderCards}</div>
+        <div class="finance-type-card" style="border-left:4px solid #FB923C;margin-top:.4rem">
+          <div class="finance-type-head"><span>🧾 訂單支出小計</span><span class="finance-type-sum" style="color:#9A3412">${fmt(orderTotal)}</span></div>
+        </div>
+
+        <div class="finance-summary-card" style="background:linear-gradient(135deg,#7C2D12,#9A3412);margin-top:1.1rem">
+          <div class="finance-summary-title">📉 ${y}年${m}月 · 本月支出總額</div>
+          <div class="finance-summary-amount">${fmt(grandTotal)}</div>
+          <div class="finance-summary-row">
+            <div class="finance-summary-sub">
+              <div class="finance-sub-label">🏪 店務支出</div>
+              <div class="finance-sub-amount">${fmt(storeTotal)}</div>
+            </div>
+            <div class="finance-summary-sub">
+              <div class="finance-sub-label">🧾 訂單支出</div>
+              <div class="finance-sub-amount">${fmt(orderTotal)}</div>
+            </div>
+          </div>
+        </div>`;
     } catch(err) {
       el.innerHTML = `<div style="text-align:center;padding:2rem;color:var(--danger)">載入失敗：${esc(err.message)}</div>`;
     }
+  }
+
+  // v3.7 從本月支出的訂單支出卡片 → 跳到該訂單詳情
+  function openOrderFromExpense(orderId) {
+    const order = allOrders.find(o => String(o.id) === String(orderId));
+    if (order) showDetail(orderId);
+    else showToast('找不到對應訂單（可能不在目前月份的場次清單）', 'error');
   }
 
   function showAddExpenseModal() {
@@ -3003,7 +3158,7 @@
         if (!ex) return showToast('找不到支出記錄', 'error');
         _editingExpId = id;
         document.getElementById('expense-modal-title').textContent = '✏️ 修改店務支出';
-        const fixedTypes = ['月租停車費','臨時停車費','網路費','電話費','電費','水費','機動PT薪資'];
+        const fixedTypes = ['月租停車費','臨時停車費','網路費','電話費','電費','水費','機動PT薪資','耗材'];
         const isCustom = !fixedTypes.includes(ex.type);
         document.getElementById('ef-type').value          = isCustom ? '其他' : ex.type;
         document.getElementById('ef-custom-wrap').style.display = isCustom ? 'block' : 'none';
