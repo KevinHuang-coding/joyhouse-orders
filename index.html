@@ -698,6 +698,14 @@
     .finance-tabs { display:flex; gap:0; background:white; border-bottom:2px solid var(--border); }
     .finance-tab { flex:1; padding:.75rem; text-align:center; font-size:.88rem; font-weight:700; cursor:pointer; color:var(--text-light); border-bottom:3px solid transparent; background:none; border-top:none; border-left:none; border-right:none; transition:all .15s; }
     .finance-tab.active { color:var(--primary); border-bottom-color:var(--primary); }
+    /* v4.2 財務頁月份切換列 */
+    .finance-month-bar { display:flex; align-items:center; gap:.45rem; background:white; padding:.55rem .9rem; border-bottom:1px solid var(--border); position:relative; }
+    .fin-month-arrow { width:2.3rem; height:2.3rem; flex:none; border:1.5px solid var(--border); background:var(--bg); border-radius:.6rem; font-size:1.15rem; font-weight:800; color:var(--text-mid); cursor:pointer; }
+    .fin-month-arrow:active { transform:scale(.94); }
+    .fin-month-label { flex:1; text-align:center; border:1.5px dashed var(--primary-light); background:#FFFBEB; border-radius:.6rem; padding:.5rem .4rem; font-size:.95rem; font-weight:800; color:var(--primary-dark); cursor:pointer; }
+    .fin-month-label:active { transform:scale(.97); }
+    .fin-month-reset { flex:none; border:none; background:var(--primary); color:#fff; border-radius:.6rem; padding:.5rem .6rem; font-size:.78rem; font-weight:700; cursor:pointer; display:none; }
+    #finance-month-input { position:absolute; left:50%; bottom:0; width:1px; height:1px; opacity:0; border:0; padding:0; pointer-events:none; }
     .finance-content { flex:1; overflow-y:auto; padding:.875rem 1rem 6rem; }
     .finance-summary-card { background:linear-gradient(135deg,var(--primary-dark),var(--primary)); color:white; border-radius:1rem; padding:1rem; margin-bottom:.75rem; }
     .finance-summary-title { font-size:.78rem; opacity:.8; margin-bottom:.25rem; }
@@ -1105,6 +1113,13 @@
   <div class="finance-tabs">
     <button class="finance-tab active" id="tab-income" onclick="switchFinanceTab('income')">📈 本月收入</button>
     <button class="finance-tab" id="tab-expense" onclick="switchFinanceTab('expense')">📉 本月支出</button>
+  </div>
+  <div class="finance-month-bar">
+    <button class="fin-month-arrow" onclick="shiftFinanceMonth(-1)">‹</button>
+    <button class="fin-month-label" id="finance-month-label" onclick="openFinanceMonthPicker()">📅 ----年--月 ▾</button>
+    <button class="fin-month-arrow" onclick="shiftFinanceMonth(1)">›</button>
+    <button class="fin-month-reset" id="finance-month-reset" onclick="resetFinanceMonth()">回本月</button>
+    <input type="month" id="finance-month-input" onchange="onFinanceMonthPicked(this.value)">
   </div>
   <div class="finance-content" id="finance-content"></div>
   <button class="finance-fab" id="finance-add-fab" onclick="showAddExpenseModal()" style="display:none">＋</button>
@@ -3083,9 +3098,13 @@
   let _ocAllOrders    = [];     // v4.0 訂單成本支出：全部訂單快取
   let _ocOrderId      = '';     // v4.0 目前選取訂單
   let _ocExpenses     = [];     // v4.0 目前訂單的成本支出陣列
+  let _finYear        = null;   // v4.2 財務頁檢視年（可與場次列表不同月）
+  let _finMonth       = null;   // v4.2 財務頁檢視月
+  let _finOrdersCache = {};     // v4.2 其他月份訂單快取（帳面營收明細用）key=YYYY-MM
 
   function showFinanceScreen() {
     _financeTab = 'income';
+    _finYear = currentYear; _finMonth = currentMonth;   // v4.2 進入時跟隨場次列表月份
     showScreen('finance-screen');
     switchFinanceTab('income');
   }
@@ -3095,15 +3114,80 @@
     document.getElementById('tab-income').classList.toggle('active', tab === 'income');
     document.getElementById('tab-expense').classList.toggle('active', tab === 'expense');
     document.getElementById('finance-add-fab').style.display = 'none';
+    updateFinanceMonthBar();
     if (tab === 'income') loadIncome();
     else loadExpense();
+  }
+
+  // ===== v4.2 財務頁月份切換（選擇其他月份金流資料）=====
+  function _finYM() { return [_finYear || currentYear, _finMonth || currentMonth]; }
+
+  function updateFinanceMonthBar() {
+    const [y, m] = _finYM();
+    const lbl = document.getElementById('finance-month-label');
+    if (lbl) lbl.textContent = `📅 ${y}年${m}月 ▾`;
+    const now = new Date();
+    const isNow = (y === now.getFullYear() && m === now.getMonth() + 1);
+    const rst = document.getElementById('finance-month-reset');
+    if (rst) rst.style.display = isNow ? 'none' : 'inline-block';
+  }
+
+  function shiftFinanceMonth(delta) {
+    const [y, m] = _finYM();
+    const r = _ymShift(y, m, delta);
+    _finYear = r[0]; _finMonth = r[1];
+    switchFinanceTab(_financeTab);
+  }
+
+  function openFinanceMonthPicker() {
+    const [y, m] = _finYM();
+    const inp = document.getElementById('finance-month-input');
+    inp.value = _ymKey(y, m);
+    if (inp.showPicker) { try { inp.showPicker(); return; } catch (e) {} }
+    inp.style.pointerEvents = 'auto';
+    inp.focus(); inp.click();
+  }
+
+  function onFinanceMonthPicked(v) {
+    if (!v) return;
+    const parts = v.split('-').map(Number);
+    if (!parts[0] || !parts[1]) return;
+    _finYear = parts[0]; _finMonth = parts[1];
+    switchFinanceTab(_financeTab);
+  }
+
+  function resetFinanceMonth() {
+    const now = new Date();
+    _finYear = now.getFullYear(); _finMonth = now.getMonth() + 1;
+    switchFinanceTab(_financeTab);
+  }
+
+  // v4.2 取財務頁檢視月份的訂單（同場次列表月→直接用 allOrders；其他月→fetch + 快取）
+  async function _getFinanceOrders() {
+    const [y, m] = _finYM();
+    if (y === currentYear && m === currentMonth) return allOrders || [];
+    const key = _ymKey(y, m);
+    if (_finOrdersCache[key]) return _finOrdersCache[key];
+    try {
+      showLoading(true, '載入 ' + y + '年' + m + '月訂單...');
+      const res  = await fetch(`${API_URL}?action=getOrders&code=${PASSCODE}&month=${m}&year=${y}`);
+      const data = await res.json();
+      showLoading(false);
+      if (!data.success) throw new Error(data.error || '讀取失敗');
+      _finOrdersCache[key] = data.orders || [];
+      return _finOrdersCache[key];
+    } catch (err) {
+      showLoading(false);
+      showToast('載入該月訂單失敗：' + err.message, 'error');
+      return null;
+    }
   }
 
   async function loadIncome() {
     const el = document.getElementById('finance-content');
     el.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--text-light)">載入中...</div>';
     try {
-      const y = currentYear, m = currentMonth;
+      const [y, m] = _finYM();
       const res  = await fetch(`${API_URL}?action=getMonthlyIncome&code=${PASSCODE}&year=${y}&month=${m}&user=${encodeURIComponent(selectedUser)}`);
       const data = await res.json();
       if (!data.success) throw new Error(data.error || '讀取失敗');
@@ -3194,7 +3278,7 @@
     const el = document.getElementById('finance-content');
     el.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--text-light)">載入中...</div>';
     try {
-      const y = currentYear, m = currentMonth;
+      const [y, m] = _finYM();
       const res  = await fetch(`${API_URL}?action=getExpenses&code=${PASSCODE}&year=${y}&month=${m}&user=${encodeURIComponent(selectedUser)}`);
       const data = await res.json();
       if (!data.success) throw new Error(data.error || '讀取失敗');
@@ -3286,10 +3370,20 @@
   }
 
   // v3.7 從本月支出的訂單支出卡片 → 跳到該訂單詳情
-  function openOrderFromExpense(orderId) {
-    const order = allOrders.find(o => String(o.id) === String(orderId));
-    if (order) showDetail(orderId);
-    else showToast('找不到對應訂單（可能不在目前月份的場次清單）', 'error');
+  async function openOrderFromExpense(orderId) {
+    let order = (allOrders || []).find(o => String(o.id) === String(orderId));
+    if (order) return showDetail(orderId);
+    const [fy, fm] = _finYM();
+    if (fy !== currentYear || fm !== currentMonth) {
+      // v4.2 訂單屬於財務頁檢視月份 → 自動把場次列表切到該月再開啟
+      currentYear = fy; currentMonth = fm;
+      updateMonthTitle();
+      allOrders = [];
+      await refreshOrders();
+      order = (allOrders || []).find(o => String(o.id) === String(orderId));
+      if (order) return showDetail(orderId);
+    }
+    showToast('找不到對應訂單（可能不在目前月份的場次清單）', 'error');
   }
 
   // ===== v4.0 訂單成本支出（財務頁新增/編輯，雙向同步訂單 col28）=====
@@ -3306,11 +3400,12 @@
       showLoading(false);
     } catch (err) { showLoading(false); showToast('❌ ' + err.message, 'error'); return; }
 
-    const pv = _ymShift(currentYear, currentMonth, -1);
-    const nx = _ymShift(currentYear, currentMonth, 1);
+    const ocym = _finYM();   // v4.2 以財務頁檢視月份為中心
+    const pv = _ymShift(ocym[0], ocym[1], -1);
+    const nx = _ymShift(ocym[0], ocym[1], 1);
     const groups = [
       { label: '前一月訂單列表', key: _ymKey(pv[0], pv[1]) },
-      { label: '本月訂單列表',   key: _ymKey(currentYear, currentMonth) },
+      { label: '本月訂單列表',   key: _ymKey(ocym[0], ocym[1]) },
       { label: '次一月訂單列表', key: _ymKey(nx[0], nx[1]) }
     ];
     const optsFor = key => _ocAllOrders
@@ -3428,8 +3523,9 @@
   function showIncomeDetail(kind) {
     if (!_incomeData) { showToast('請先載入本月收入', 'error'); return; }
     const list = kind === 'deposit' ? (_incomeData.actualDepositDetails || []) : (_incomeData.actualFinalDetails || []);
+    const [fy, fm] = _finYM();
     document.getElementById('income-detail-title').textContent =
-      `${currentYear}年${currentMonth}月 · 實際入帳${kind === 'deposit' ? '訂金' : '尾款'}明細`;
+      `${fy}年${fm}月 · 實際入帳${kind === 'deposit' ? '訂金' : '尾款'}明細`;
     const fmt = n => 'NT$ ' + Number(n || 0).toLocaleString();
     const total = list.reduce((a, e) => a + Number(e.amount || 0), 0);
     const body = document.getElementById('income-detail-body');
@@ -3456,9 +3552,11 @@
   function backFromIncomeDetail() { showScreen('finance-screen'); _financeTab = 'income'; switchFinanceTab('income'); }
 
   // v4.1 帳面營收 → 各訂單明細（純前台，資料源 allOrders，與後端 byType 同口徑）
-  function showBookedDetail(typeKey) {
+  async function showBookedDetail(typeKey) {
     const numv = v => Number(String(v || '').replace(/[^0-9.]/g, '') || 0);
-    const list = (allOrders || [])
+    const src = await _getFinanceOrders();   // v4.2 用財務頁檢視月份的訂單
+    if (src === null) return;
+    const list = (src || [])
       .filter(o => o.eventType !== '人員休')
       .filter(o => ((o.eventType === '婚禮場' || o.eventType === '商業場') ? o.eventType : '其他') === typeKey)
       .map(o => {
@@ -3470,8 +3568,9 @@
     const icon  = typeKey === '婚禮場' ? '💒' : typeKey === '商業場' ? '🏢' : '📦';
     const color = typeKey === '婚禮場' ? '#BE185D' : typeKey === '商業場' ? '#1D4ED8' : '#92400E';
     const fmt = n => 'NT$ ' + Number(n || 0).toLocaleString();
+    const [fy, fm] = _finYM();
     document.getElementById('income-detail-title').textContent =
-      `${currentYear}年${currentMonth}月 · ${icon} ${typeKey} 各訂單帳面營收明細`;
+      `${fy}年${fm}月 · ${icon} ${typeKey} 各訂單帳面營收明細`;
     const depTotal = list.reduce((a, e) => a + e.deposit, 0);
     const finTotal = list.reduce((a, e) => a + e.final, 0);
     const body = document.getElementById('income-detail-body');
@@ -3518,7 +3617,8 @@
   }
 
   function editExpense(id) {
-    fetch(`${API_URL}?action=getExpenses&code=${PASSCODE}&year=${currentYear}&month=${currentMonth}&user=${encodeURIComponent(selectedUser)}`)
+    const [fy, fm] = _finYM();
+    fetch(`${API_URL}?action=getExpenses&code=${PASSCODE}&year=${fy}&month=${fm}&user=${encodeURIComponent(selectedUser)}`)
       .then(r => r.json())
       .then(data => {
         const ex = (data.expenses || []).find(e => e.id === id);
