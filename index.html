@@ -911,6 +911,8 @@
       <button class="user-btn" ontouchstart="event.preventDefault();selectUser('之曦')" onclick="selectUser('之曦')">之曦</button>
       <button class="user-btn" ontouchstart="event.preventDefault();selectUser('Kid')" onclick="selectUser('Kid')">Kid</button>
       <button class="user-btn" ontouchstart="event.preventDefault();selectUser('Erin')" onclick="selectUser('Erin')">Erin</button>
+      <button class="user-btn" ontouchstart="event.preventDefault();selectUser('仲威')" onclick="selectUser('仲威')">仲威</button>
+      <button class="user-btn" ontouchstart="event.preventDefault();selectUser('小李')" onclick="selectUser('小李')">小李</button>
     </div>
   </div>
   <div class="pin-section" id="pin-section" style="display:none">
@@ -1250,6 +1252,7 @@
   let PASSCODE       = '';
   let currentPin     = '';
   let selectedUser   = '';
+  let bigPrintOnlyMode = false;   // v4.3 受限帳號（仲威/小李）只能用大圖輸出紀錄
   let editingOrderId       = null;
   let _editingOriginalDate = '';   // 編輯訂單時記錄原始日期，供改期衝突檢查使用
   let currentYear    = new Date().getFullYear();
@@ -1327,7 +1330,7 @@
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
     document.getElementById(id).classList.add('active');
     const isRight = RIGHT_SCREENS.indexOf(id) >= 0;
-    const split = _isDesktop() && (id === 'main-screen' || isRight);
+    const split = !bigPrintOnlyMode && _isDesktop() && (id === 'main-screen' || isRight);
     document.body.classList.toggle('dt-split', split);
     if (split) {
       if (isRight) {
@@ -1434,14 +1437,24 @@
         updatePinDisplay();
         document.getElementById('pin-error').textContent = '';
         showLoading(false);
-        // 財務頁按鈕：依後端 finance 旗標（PIN 已綁定帳號，防共用碼點錯名字）
+        bigPrintOnlyMode = !!data.bigprintOnly;
         const finBtn = document.getElementById('finance-nav-btn');
-        if (finBtn) finBtn.style.display = data.finance ? 'flex' : 'none';
-        const bpBtn = document.getElementById('bigprint-nav-btn');
-        if (bpBtn) bpBtn.style.display = data.finance ? 'flex' : 'none';
-        showScreen('main-screen');
-        updateMonthTitle();
-        await refreshOrders();
+        const bpBtn  = document.getElementById('bigprint-nav-btn');
+        if (bigPrintOnlyMode) {
+          // 受限帳號（仲威/小李）：登入後直接進大圖輸出紀錄，藏起其餘導覽
+          document.body.classList.add('bp-only');
+          if (finBtn) finBtn.style.display = 'none';
+          if (bpBtn)  bpBtn.style.display  = 'none';
+          showBigPrintScreen(undefined, 'bponly');
+        } else {
+          document.body.classList.remove('bp-only');
+          // 財務頁按鈕：依後端 finance 旗標；大圖按鈕全員可見
+          if (finBtn) finBtn.style.display = data.finance ? 'flex' : 'none';
+          if (bpBtn)  bpBtn.style.display  = 'flex';
+          showScreen('main-screen');
+          updateMonthTitle();
+          await refreshOrders();
+        }
       } else {
         pinError('驗證碼錯誤，請確認已點選正確帳號');
         showLoading(false);
@@ -1477,6 +1490,7 @@
   }
   function logout() {
     PASSCODE = ''; currentPin = ''; selectedUser = ''; allOrders = [];
+    bigPrintOnlyMode = false; document.body.classList.remove('bp-only');
     updatePinDisplay();
     const finBtn = document.getElementById('finance-nav-btn');
     if (finBtn) finBtn.style.display = 'none';
@@ -3612,6 +3626,7 @@
           <div class="extra-dep-head"><span class="t">🖼️ ${esc(b.item)||'（未填品項）'}${b.size?' · '+esc(b.size):''}</span>
             <span style="font-weight:800;color:#92400E">${amt}</span></div>
           <div style="font-size:.78rem;color:var(--text-light)">使用日：${esc(b.useDate)||'－'} ｜ 發包日：${esc(b.dispatchDate)||'－'}${b.vendor?' ｜ 發包人：'+esc(b.vendor):''}${b.note?' ｜ '+esc(b.note):''}</div>
+          <div style="font-size:.78rem;color:var(--text-light)">印刷商：${esc(b.printer)||'－'}${b.dueDate?' ｜ 預計完工：'+esc(b.dueDate):''} ｜ ${b.returned==='已取回'?'✅已取回':'📦尚未取回'}</div>
         </div>`;
     }).join('') +
       `<div class="finance-type-card" style="border-left:4px solid #FCD34D;margin-top:.3rem">
@@ -3674,6 +3689,7 @@
             </div>
             <div class="expense-meta">使用日：${esc(b.useDate)||'－'} ｜ 場次：${esc(b.session)||'－'}</div>
             <div class="expense-meta">歸屬：${where}${b.vendor?' ｜ 發包人：'+esc(b.vendor):''}${b.dispatchDate?' ｜ 發包日：'+esc(b.dispatchDate):''}</div>
+            <div class="expense-meta">印刷商：${esc(b.printer)||'－'}${b.dueDate?' ｜ 預計完工：'+esc(b.dueDate):''} ｜ ${b.returned==='已取回'?'✅ 已取回':'📦 尚未取回'}</div>
           </div>`;
         }).join('');
       });
@@ -3697,6 +3713,8 @@
     const useDate = rec ? rec.useDate : '';
     const sel = _bpSessionOptions(useDate, rec ? rec.orderId : (_bpReturnOrderId||''));
     const manualShown = rec ? !rec.bound : false;
+    const printerVal = rec ? (rec.printer||'') : '';
+    const printerIsOther = !!printerVal && ['美果','欣工廠'].indexOf(printerVal) < 0;
     document.getElementById('bigprint-form-title').textContent = id ? '✏️ 編輯大圖輸出紀錄' : '🖼️ 新增大圖輸出紀錄';
     const head = useDate ? (sel.count?'— 請選擇當天場次 —':'（當天無場次，請改手動輸入）') : '— 請先選使用日期 —';
     document.getElementById('bigprint-form-body').innerHTML = `
@@ -3714,6 +3732,22 @@
       <div class="payment-field"><label>尺寸</label><input type="text" id="bp-size" value="${esc(rec?rec.size:'')}" placeholder="例：80x60"></div>
       <div class="payment-field"><label>成本價</label><input type="number" id="bp-amount" value="${esc(rec?rec.amount:'')}" placeholder="例：320"></div>
       <div class="payment-field"><label>發包人</label><input type="text" id="bp-vendor" value="${esc(rec?rec.vendor:'')}" placeholder="例：jpi"></div>
+      <div class="payment-field"><label>印刷商</label>
+        <select id="bp-printer" class="oc-select" onchange="onBpPrinterChange()">
+          <option value="">－ 請選擇 －</option>
+          <option value="美果" ${printerVal==='美果'?'selected':''}>美果</option>
+          <option value="欣工廠" ${printerVal==='欣工廠'?'selected':''}>欣工廠</option>
+          <option value="__other__" ${printerIsOther?'selected':''}>其他廠商（請手key）</option>
+        </select>
+      </div>
+      <div class="payment-field" id="bp-printer-other-wrap" style="display:${printerIsOther?'flex':'none'}"><label>其他印刷商</label><input type="text" id="bp-printer-other" value="${esc(printerIsOther?printerVal:'')}" placeholder="請輸入印刷商名稱"></div>
+      <div class="payment-field"><label>預計完工日期</label><input type="date" id="bp-duedate" value="${esc(rec?rec.dueDate:'')}"></div>
+      <div class="payment-field"><label>是否已取回滿屋</label>
+        <select id="bp-returned" class="oc-select">
+          <option value="尚未取回" ${(!rec||rec.returned!=='已取回')?'selected':''}>尚未取回</option>
+          <option value="已取回" ${rec&&rec.returned==='已取回'?'selected':''}>已取回</option>
+        </select>
+      </div>
       <div class="payment-field"><label>備註</label><input type="text" id="bp-note" value="${esc(rec?rec.note:'')}" placeholder="例：急件"></div>
       <button class="payment-save-btn" style="background:#B45309" onclick="saveBigPrint()">💾 儲存大圖輸出紀錄</button>
       ${id ? `<button class="delete-btn" onclick="deleteBigPrintConfirm('${esc(id)}')">🗑️ 刪除此筆</button>` : ''}
@@ -3740,6 +3774,12 @@
     if (wrap) wrap.style.display = (v === '__manual__') ? 'flex' : 'none';
   }
 
+  function onBpPrinterChange() {
+    const v = document.getElementById('bp-printer').value;
+    const wrap = document.getElementById('bp-printer-other-wrap');
+    if (wrap) wrap.style.display = (v === '__other__') ? 'flex' : 'none';
+  }
+
   async function saveBigPrint() {
     const useDate = document.getElementById('bp-usedate').value;
     const sessSel = document.getElementById('bp-session').value;
@@ -3754,6 +3794,8 @@
       const ord = _bpAllOrders.find(o => String(o.id) === String(orderId));
       session = ord ? (_mmdd(ord.date) + '/' + (ord.clientName||'未命名')) : '';
     }
+    let printer = document.getElementById('bp-printer').value;
+    if (printer === '__other__') { printer = (document.getElementById('bp-printer-other').value||'').trim(); }
     const rec = {
       dispatchDate: document.getElementById('bp-dispatchdate').value,
       useDate: useDate, session: session,
@@ -3761,6 +3803,9 @@
       size: document.getElementById('bp-size').value,
       amount: document.getElementById('bp-amount').value,
       vendor: document.getElementById('bp-vendor').value,
+      printer: printer,
+      dueDate: document.getElementById('bp-duedate').value,
+      returned: document.getElementById('bp-returned').value,
       note: document.getElementById('bp-note').value
     };
     const action = _bpEditId ? 'updateBigPrint' : 'addBigPrint';
@@ -3822,6 +3867,7 @@
   }
 
   function backFromBigPrint() {
+    if (bigPrintOnlyMode) { logout(); return; }
     if (_bpOrigin === 'detail' && _bpReturnOrderId) { showDetail(_bpReturnOrderId); return; }
     if (_bpOrigin === 'finance') { showScreen('finance-screen'); _financeTab = 'expense'; switchFinanceTab('expense'); return; }
     showMain();
