@@ -3603,6 +3603,7 @@
   // ===== v4.3 大圖輸出紀錄 =====
   let _bpAllOrders = [];     // getAllOrders 快取（使用日期→當天場次下拉）
   let _bpList = [];          // 目前所有大圖紀錄
+  let _bpHistory = [];       // v4.3 大圖操作歷史（取貨/編輯）
   let _bpEditId = '';        // 編輯中 id（空＝新增）
   let _bpReturnOrderId = ''; // 從訂單詳情帶入的訂單
   let _bpOrigin = '';        // 來源：detail / finance / main
@@ -3639,15 +3640,18 @@
     _bpOrigin = origin || (preOrderId ? 'detail' : 'main');
     showLoading(true, '載入大圖輸出紀錄...');
     try {
-      const [oRes, bRes] = await Promise.all([
+      const [oRes, bRes, hRes] = await Promise.all([
         fetch(`${API_URL}?action=getAllOrders&code=${PASSCODE}`),
-        fetch(`${API_URL}?action=getBigPrints&code=${PASSCODE}&user=${encodeURIComponent(selectedUser)}`)
+        fetch(`${API_URL}?action=getBigPrints&code=${PASSCODE}&user=${encodeURIComponent(selectedUser)}`),
+        fetch(`${API_URL}?action=getBigPrintHistory&code=${PASSCODE}`)
       ]);
       const oData = await oRes.json();
       const bData = await bRes.json();
+      const hData = await hRes.json();
       if (!bData.success) throw new Error(bData.error || '讀取失敗');
       _bpAllOrders = oData.orders || [];
       _bpList = bData.bigPrints || [];
+      _bpHistory = (hData && hData.success) ? (hData.history || []) : [];
       showLoading(false);
     } catch (err) { showLoading(false); showToast('❌ ' + err.message, 'error'); return; }
     renderBigPrintList();
@@ -3693,6 +3697,21 @@
           </div>`;
         }).join('');
       });
+    }
+    // ── 歷史紀錄（取貨與編輯）──
+    html += `<div style="font-weight:800;color:var(--text-mid);margin:1.3rem 0 .45rem;font-size:.92rem;border-top:2px solid var(--border);padding-top:.85rem">🕘 歷史紀錄（取貨與編輯）</div>`;
+    if (!_bpHistory.length) {
+      html += '<div style="text-align:center;padding:1rem;color:var(--text-light);font-size:.85rem">尚無歷史紀錄</div>';
+    } else {
+      const actIcon = a => a.indexOf('刪除')>=0?'🗑️':(a.indexOf('新增')>=0?'➕':'✏️');
+      html += _bpHistory.map(h => `
+        <div class="expense-card" style="border-left:4px solid #94A3B8;cursor:default">
+          <div class="expense-card-row">
+            <span class="expense-type">${actIcon(h.action)} ${esc(h.user)}</span>
+            <span style="font-size:.72rem;color:var(--text-light)">${esc(h.time)}</span>
+          </div>
+          <div class="expense-meta">${esc(h.details)}</div>
+        </div>`).join('');
     }
     body.innerHTML = html;
   }
@@ -3826,9 +3845,15 @@
 
   async function _bpRefreshList() {
     try {
-      const bRes = await fetch(`${API_URL}?action=getBigPrints&code=${PASSCODE}&user=${encodeURIComponent(selectedUser)}`);
+      const [bRes, hRes] = await Promise.all([
+        fetch(`${API_URL}?action=getBigPrints&code=${PASSCODE}&user=${encodeURIComponent(selectedUser)}`),
+        fetch(`${API_URL}?action=getBigPrintHistory&code=${PASSCODE}`)
+      ]);
       const bData = await bRes.json();
-      if (bData.success) { _bpList = bData.bigPrints || []; renderBigPrintList(); }
+      const hData = await hRes.json();
+      if (bData.success) { _bpList = bData.bigPrints || []; }
+      if (hData && hData.success) { _bpHistory = hData.history || []; }
+      renderBigPrintList();
     } catch (e) { /* ignore */ }
   }
 
