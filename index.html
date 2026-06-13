@@ -3640,18 +3640,15 @@
     _bpOrigin = origin || (preOrderId ? 'detail' : 'main');
     showLoading(true, '載入大圖輸出紀錄...');
     try {
-      const [oRes, bRes, hRes] = await Promise.all([
+      const [oRes, bRes] = await Promise.all([
         fetch(`${API_URL}?action=getAllOrders&code=${PASSCODE}`),
-        fetch(`${API_URL}?action=getBigPrints&code=${PASSCODE}&user=${encodeURIComponent(selectedUser)}`),
-        fetch(`${API_URL}?action=getBigPrintHistory&code=${PASSCODE}`)
+        fetch(`${API_URL}?action=getBigPrints&code=${PASSCODE}&user=${encodeURIComponent(selectedUser)}`)
       ]);
       const oData = await oRes.json();
       const bData = await bRes.json();
-      const hData = await hRes.json();
       if (!bData.success) throw new Error(bData.error || '讀取失敗');
       _bpAllOrders = oData.orders || [];
       _bpList = bData.bigPrints || [];
-      _bpHistory = (hData && hData.success) ? (hData.history || []) : [];
       showLoading(false);
     } catch (err) { showLoading(false); showToast('❌ ' + err.message, 'error'); return; }
     renderBigPrintList();
@@ -3697,21 +3694,6 @@
           </div>`;
         }).join('');
       });
-    }
-    // ── 歷史紀錄（取貨與編輯）──
-    html += `<div style="font-weight:800;color:var(--text-mid);margin:1.3rem 0 .45rem;font-size:.92rem;border-top:2px solid var(--border);padding-top:.85rem">🕘 歷史紀錄（取貨與編輯）</div>`;
-    if (!_bpHistory.length) {
-      html += '<div style="text-align:center;padding:1rem;color:var(--text-light);font-size:.85rem">尚無歷史紀錄</div>';
-    } else {
-      const actIcon = a => a.indexOf('刪除')>=0?'🗑️':(a.indexOf('新增')>=0?'➕':'✏️');
-      html += _bpHistory.map(h => `
-        <div class="expense-card" style="border-left:4px solid #94A3B8;cursor:default">
-          <div class="expense-card-row">
-            <span class="expense-type">${actIcon(h.action)} ${esc(h.user)}</span>
-            <span style="font-size:.72rem;color:var(--text-light)">${esc(h.time)}</span>
-          </div>
-          <div class="expense-meta">${esc(h.details)}</div>
-        </div>`).join('');
     }
     body.innerHTML = html;
   }
@@ -3770,8 +3752,34 @@
       <div class="payment-field"><label>備註</label><input type="text" id="bp-note" value="${esc(rec?rec.note:'')}" placeholder="例：急件"></div>
       <button class="payment-save-btn" style="background:#B45309" onclick="saveBigPrint()">💾 儲存大圖輸出紀錄</button>
       ${id ? `<button class="delete-btn" onclick="deleteBigPrintConfirm('${esc(id)}')">🗑️ 刪除此筆</button>` : ''}
+      <div id="bp-history-wrap"></div>
     `;
     document.getElementById('bigprint-modal').classList.remove('hidden');
+    if (id) loadBpHistory(id);
+  }
+
+  // 載入「這張大圖」的歷史紀錄（只顯示該筆，不含系統級/別張）
+  async function loadBpHistory(id) {
+    const wrap = document.getElementById('bp-history-wrap');
+    if (!wrap) return;
+    wrap.innerHTML = '<div style="font-size:.8rem;color:var(--text-light);padding:.6rem 0">載入歷史紀錄...</div>';
+    try {
+      const res = await fetch(`${API_URL}?action=getBigPrintHistory&code=${PASSCODE}&id=${encodeURIComponent(id)}`);
+      const data = await res.json();
+      const hist = (data && data.success) ? (data.history || []) : [];
+      const actIcon = a => a.indexOf('刪除')>=0?'🗑️':(a.indexOf('新增')>=0?'➕':'✏️');
+      let h = '<div style="font-weight:800;color:var(--text-mid);margin:1rem 0 .45rem;font-size:.88rem;border-top:1px solid var(--border);padding-top:.7rem">🕘 這張大圖的歷史紀錄</div>';
+      if (!hist.length) {
+        h += '<div style="font-size:.82rem;color:var(--text-light);padding:.3rem 0">尚無歷史紀錄</div>';
+      } else {
+        h += hist.map(x => `
+          <div class="extra-dep-card">
+            <div class="extra-dep-head"><span class="t">${actIcon(x.action)} ${esc(x.user)}</span><span style="font-size:.7rem;color:var(--text-light)">${esc(x.time)}</span></div>
+            <div style="font-size:.8rem;color:var(--text-light)">${esc(x.details)}</div>
+          </div>`).join('');
+      }
+      wrap.innerHTML = h;
+    } catch (e) { wrap.innerHTML = '<div style="font-size:.8rem;color:var(--danger)">歷史紀錄載入失敗</div>'; }
   }
 
   function closeBpForm() { document.getElementById('bigprint-modal').classList.add('hidden'); }
@@ -3845,15 +3853,9 @@
 
   async function _bpRefreshList() {
     try {
-      const [bRes, hRes] = await Promise.all([
-        fetch(`${API_URL}?action=getBigPrints&code=${PASSCODE}&user=${encodeURIComponent(selectedUser)}`),
-        fetch(`${API_URL}?action=getBigPrintHistory&code=${PASSCODE}`)
-      ]);
+      const bRes = await fetch(`${API_URL}?action=getBigPrints&code=${PASSCODE}&user=${encodeURIComponent(selectedUser)}`);
       const bData = await bRes.json();
-      const hData = await hRes.json();
-      if (bData.success) { _bpList = bData.bigPrints || []; }
-      if (hData && hData.success) { _bpHistory = hData.history || []; }
-      renderBigPrintList();
+      if (bData.success) { _bpList = bData.bigPrints || []; renderBigPrintList(); }
     } catch (e) { /* ignore */ }
   }
 
