@@ -786,7 +786,8 @@
       body.dt-split[data-right="detail-screen"]        #detail-screen,
       body.dt-split[data-right="finance-screen"]       #finance-screen,
       body.dt-split[data-right="order-cost-screen"]    #order-cost-screen,
-      body.dt-split[data-right="income-detail-screen"] #income-detail-screen {
+      body.dt-split[data-right="income-detail-screen"] #income-detail-screen,
+      body.dt-split[data-right="bigprint-screen"]      #bigprint-screen {
         display: flex !important; grid-column: 2; grid-row: 1; height: 100dvh; overflow: hidden;
       }
       /* split 時隱藏其餘畫面 */
@@ -798,7 +799,8 @@
       body.dt-split #detail-screen .detail-body,
       body.dt-split #finance-screen .finance-content,
       body.dt-split #order-cost-screen .detail-body,
-      body.dt-split #income-detail-screen .detail-body { overflow-y: auto; }
+      body.dt-split #income-detail-screen .detail-body,
+      body.dt-split #bigprint-screen .detail-body { overflow-y: auto; }
       /* 詳情/財務在桌機並排時返回鈕無用 → 隱藏；訂單成本/入帳明細需返回財務 → 保留 */
       body.dt-split #detail-screen .back-btn,
       body.dt-split #finance-screen .back-btn { display: none; }
@@ -946,6 +948,7 @@
       <div class="header-brand">🏠 滿屋設計店務</div>
       <div class="header-actions">
         <button class="header-btn" id="finance-nav-btn" onclick="showFinanceScreen()" title="每月收入支出" style="display:none">💰</button>
+        <button class="header-btn" id="bigprint-nav-btn" onclick="showBigPrintScreen()" title="大圖輸出紀錄" style="display:none">🖼️</button>
         <button class="header-btn" onclick="refreshOrders()" title="重新整理">↻</button>
         <button class="header-btn" onclick="logout()" title="登出">⏏</button>
       </div>
@@ -1143,6 +1146,25 @@
   <div class="detail-body" id="income-detail-body"></div>
 </div>
 
+<!-- ===== 大圖輸出紀錄頁（v4.3）===== -->
+<div class="screen" id="bigprint-screen">
+  <div class="sub-header">
+    <button class="back-btn" onclick="backFromBigPrint()">‹</button>
+    <h2>🖼️ 大圖輸出紀錄</h2>
+  </div>
+  <div class="detail-body" id="bigprint-body"></div>
+</div>
+<!-- 大圖輸出 新增/編輯 modal -->
+<div class="modal-overlay hidden" id="bigprint-modal">
+  <div class="modal-sheet">
+    <div class="modal-header">
+      <div class="modal-title" id="bigprint-form-title">🖼️ 新增大圖輸出紀錄</div>
+      <button class="modal-close" onclick="closeBpForm()">✕</button>
+    </div>
+    <div class="modal-scroll" id="bigprint-form-body" style="padding:1rem"></div>
+  </div>
+</div>
+
 <!-- ===== EXPENSE FORM MODAL ===== -->
 <div class="modal-overlay hidden" id="expense-modal">
   <div class="modal-sheet">
@@ -1239,6 +1261,7 @@
   let _depInvoicePhoto = '';   // v3.5 訂金發票照片連結
   let _finInvoicePhoto = '';   // v3.5 尾款發票照片連結
   let _orderExpenses   = [];   // v3.7 訂單支出發票紀錄陣列
+  let _detailBigPrints = [];   // v4.3 此訂單大圖輸出（唯讀）
   let selectedStaff  = [];   // 目前選中的出勤人員陣列
   let _poolState     = {};   // 今日待命人力池 { 'YYYY-MM-DD': ['name',...] }，localStorage 持久化
 
@@ -1299,7 +1322,7 @@
     if (card) card.classList.add('selected');
   }
 
-  const RIGHT_SCREENS = ['detail-screen','finance-screen','order-cost-screen','income-detail-screen'];
+  const RIGHT_SCREENS = ['detail-screen','finance-screen','order-cost-screen','income-detail-screen','bigprint-screen'];
   function showScreen(id) {
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
     document.getElementById(id).classList.add('active');
@@ -1414,6 +1437,8 @@
         // 財務頁按鈕：依後端 finance 旗標（PIN 已綁定帳號，防共用碼點錯名字）
         const finBtn = document.getElementById('finance-nav-btn');
         if (finBtn) finBtn.style.display = data.finance ? 'flex' : 'none';
+        const bpBtn = document.getElementById('bigprint-nav-btn');
+        if (bpBtn) bpBtn.style.display = data.finance ? 'flex' : 'none';
         showScreen('main-screen');
         updateMonthTitle();
         await refreshOrders();
@@ -1455,6 +1480,8 @@
     updatePinDisplay();
     const finBtn = document.getElementById('finance-nav-btn');
     if (finBtn) finBtn.style.display = 'none';
+    const bpBtn = document.getElementById('bigprint-nav-btn');
+    if (bpBtn) bpBtn.style.display = 'none';
     showScreen('login-screen');
     document.getElementById('pin-section').style.display   = 'none';
     document.getElementById('user-selector').style.display = 'block';
@@ -2013,7 +2040,11 @@
     _depInvoicePhoto = order.depositInvoicePhoto || '';
     _finInvoicePhoto = order.finalInvoicePhoto || '';
     _orderExpenses = Array.isArray(order.orderExpenses)
-      ? order.orderExpenses.map(function (x) { return Object.assign({}, x); })
+      ? order.orderExpenses.filter(function (x) { return !(x && x.kind === 'bigprint'); }).map(function (x) { return Object.assign({}, x); })
+      : [];
+    // v4.3 此訂單的大圖輸出成本（唯讀；於大圖輸出紀錄頁管理）
+    _detailBigPrints = Array.isArray(order.orderExpenses)
+      ? order.orderExpenses.filter(function (x) { return x && x.kind === 'bigprint'; })
       : [];
     const depInvLink = _depInvoicePhoto
       ? '<a class="invoice-photo-link" href="' + esc(_depInvoicePhoto) + '" target="_blank">已上傳✔ 檢視</a>' : '';
@@ -2154,6 +2185,13 @@
         <button class="payment-save-btn" onclick="saveOrderExpenses('${esc(id)}')">💾 儲存訂單支出發票</button>
       </div>
 
+      <!-- v4.3 大圖輸出成本（唯讀，於大圖輸出紀錄頁管理）-->
+      <div class="payment-section" style="background:#FEF3C7;border-color:#FCD34D">
+        <div class="payment-section-title" style="color:#92400E">🖼️ 大圖輸出成本　<span style="font-weight:500;font-size:.72rem;color:var(--text-light)">·於大圖輸出紀錄頁管理</span></div>
+        <div id="detail-bigprint-wrap"></div>
+        <button type="button" class="add-extra-dep-btn" style="background:#B45309" onclick="showBigPrintScreen('${esc(id)}','detail')">🖼️ 開啟大圖輸出紀錄</button>
+      </div>
+
       <div class="created-at">建立時間：${esc(order.createdAt) || '－'}</div>
       <button class="edit-btn" onclick="showEditOrder('${esc(id)}')">✏️ 編輯此場次訂單</button>
       <button class="delete-btn" onclick="confirmDelete('${esc(id)}')">🗑️ 刪除此場次訂單</button>
@@ -2166,6 +2204,7 @@
     showScreen('detail-screen');
     renderExtraDeposits();
     renderOrderExpenses();
+    renderDetailBigPrints();
     loadHistory(id);
     _highlightSelectedCard(id);
     const _db = document.getElementById('detail-body'); if (_db) _db.scrollTop = 0;
@@ -3284,11 +3323,26 @@
       if (!data.success) throw new Error(data.error || '讀取失敗');
       const exps  = data.expenses || [];
       const oexps = data.orderExpenses || [];
+      const bps   = data.bigPrints || [];
       const fmt = n => 'NT$ ' + Number(n || 0).toLocaleString();
       const numv = v => Number(String(v || '').replace(/[^0-9.]/g,'') || 0);
       const storeTotal = (data.storeTotal != null) ? data.storeTotal : exps.reduce((a,e)=>a+numv(e.amount),0);
       const orderTotal = (data.orderTotal != null) ? data.orderTotal : oexps.reduce((a,e)=>a+numv(e.amount),0);
-      const grandTotal = (data.grandTotal != null) ? data.grandTotal : (storeTotal + orderTotal);
+      const bigPrintTotal = (data.bigPrintTotal != null) ? data.bigPrintTotal : bps.reduce((a,e)=>a+numv(e.amount),0);
+      const grandTotal = (data.grandTotal != null) ? data.grandTotal : (storeTotal + orderTotal + bigPrintTotal);
+      const bpCards = bps.length ? bps.map(bp => {
+        const amt = bp.amount ? 'NT$ ' + numv(bp.amount).toLocaleString() : '－';
+        const where = bp.orderId ? (esc(bp.clientName)||'訂單') + '（' + esc(bp.orderDate) + '）' : '⚠️ 未綁定';
+        return `
+        <div class="expense-card" style="border-left:4px solid #FCD34D" onclick="showBigPrintScreen('','finance')">
+          <div class="expense-card-row">
+            <span class="expense-type">🖼️ ${esc(bp.item)||'（未填品項）'}${bp.size?' · '+esc(bp.size):''}</span>
+            <span style="font-weight:800;color:#92400E">${amt}</span>
+          </div>
+          <div class="expense-meta">場次：${esc(bp.session)||'－'} ｜ 歸屬：${where}</div>
+          <div class="expense-meta">使用日：${esc(bp.useDate)||'－'} ｜ 發包日：${esc(bp.dispatchDate)||'－'}${bp.vendor?' ｜ 發包人：'+esc(bp.vendor):''}</div>
+        </div>`;
+      }).join('') : '<div style="text-align:center;padding:1rem;color:var(--text-light);font-size:.85rem">本月尚無大圖輸出成本</div>';
 
       // ① 店務支出
       const storeCards = exps.length ? exps.map(ex => {
@@ -3350,6 +3404,15 @@
           <div class="finance-type-head"><span>🧾 訂單成本支出小計</span><span class="finance-type-sum" style="color:#9A3412">${fmt(orderTotal)}</span></div>
         </div>
 
+        <div class="finance-block-head" style="margin-top:1.1rem">
+          <span style="font-size:.9rem;font-weight:800;color:#92400E">🖼️ 大圖輸出成本<span style="font-weight:500;color:var(--text-light);font-size:.72rem"> ·與訂單成本雙向同步</span></span>
+          <button class="finance-block-add" style="background:#B45309" onclick="showBigPrintScreen('','finance')">＋ 大圖輸出</button>
+        </div>
+        <div>${bpCards}</div>
+        <div class="finance-type-card" style="border-left:4px solid #FCD34D;margin-top:.4rem">
+          <div class="finance-type-head"><span>🖼️ 大圖輸出成本小計</span><span class="finance-type-sum" style="color:#92400E">${fmt(bigPrintTotal)}</span></div>
+        </div>
+
         <div class="finance-summary-card" style="background:linear-gradient(135deg,#7C2D12,#9A3412);margin-top:1.1rem">
           <div class="finance-summary-title">📉 ${y}年${m}月 · 本月支出總額</div>
           <div class="finance-summary-amount">${fmt(grandTotal)}</div>
@@ -3361,6 +3424,10 @@
             <div class="finance-summary-sub">
               <div class="finance-sub-label">🧾 訂單成本支出</div>
               <div class="finance-sub-amount">${fmt(orderTotal)}</div>
+            </div>
+            <div class="finance-summary-sub">
+              <div class="finance-sub-label">🖼️ 大圖輸出成本</div>
+              <div class="finance-sub-amount">${fmt(bigPrintTotal)}</div>
             </div>
           </div>
         </div>`;
@@ -3448,7 +3515,7 @@
     const area = document.getElementById('oc-detail-area');
     if (!_ocOrderId) { if (area) area.style.display = 'none'; return; }
     const ord = _ocAllOrders.find(o => String(o.id) === String(_ocOrderId));
-    _ocExpenses = (ord && Array.isArray(ord.orderExpenses)) ? ord.orderExpenses.map(x => Object.assign({}, x)) : [];
+    _ocExpenses = (ord && Array.isArray(ord.orderExpenses)) ? ord.orderExpenses.filter(x => !(x && x.kind === 'bigprint')).map(x => Object.assign({}, x)) : [];
     const banner = document.getElementById('oc-order-banner');
     if (banner && ord) banner.innerHTML = `📋 ${esc(ord.clientName) || '（未命名）'}　${esc(ord.date)}　<span style="color:var(--text-light)">${esc(ord.eventType)}</span>`;
     if (area) area.style.display = 'block';
@@ -3518,6 +3585,247 @@
   }
 
   function backFromOrderCost() { showScreen('finance-screen'); _financeTab = 'expense'; switchFinanceTab('expense'); }
+
+  // ===== v4.3 大圖輸出紀錄 =====
+  let _bpAllOrders = [];     // getAllOrders 快取（使用日期→當天場次下拉）
+  let _bpList = [];          // 目前所有大圖紀錄
+  let _bpEditId = '';        // 編輯中 id（空＝新增）
+  let _bpReturnOrderId = ''; // 從訂單詳情帶入的訂單
+  let _bpOrigin = '';        // 來源：detail / finance / main
+
+  function _mmdd(d) { const t = String(d||''); const a = t.split('-'); return (a.length===3) ? (a[1]+a[2]) : t.replace(/[^0-9]/g,'').slice(4,8); }
+
+  // 訂單詳情頁：唯讀渲染此訂單的大圖輸出成本
+  function renderDetailBigPrints() {
+    const wrap = document.getElementById('detail-bigprint-wrap');
+    if (!wrap) return;
+    const numv = v => Number(String(v||'').replace(/[^0-9.]/g,'')||0);
+    if (!_detailBigPrints.length) {
+      wrap.innerHTML = '<div style="font-size:.82rem;color:var(--text-light);padding:.3rem 0 .6rem">此場次尚無大圖輸出成本</div>';
+      return;
+    }
+    const total = _detailBigPrints.reduce((a,b)=>a+numv(b.amount),0);
+    wrap.innerHTML = _detailBigPrints.map(function (b) {
+      const amt = b.amount ? 'NT$ ' + numv(b.amount).toLocaleString() : '－';
+      return `
+        <div class="extra-dep-card">
+          <div class="extra-dep-head"><span class="t">🖼️ ${esc(b.item)||'（未填品項）'}${b.size?' · '+esc(b.size):''}</span>
+            <span style="font-weight:800;color:#92400E">${amt}</span></div>
+          <div style="font-size:.78rem;color:var(--text-light)">使用日：${esc(b.useDate)||'－'} ｜ 發包日：${esc(b.dispatchDate)||'－'}${b.vendor?' ｜ 發包人：'+esc(b.vendor):''}${b.note?' ｜ '+esc(b.note):''}</div>
+        </div>`;
+    }).join('') +
+      `<div class="finance-type-card" style="border-left:4px solid #FCD34D;margin-top:.3rem">
+         <div class="finance-type-head"><span>🖼️ 大圖輸出成本小計</span><span class="finance-type-sum" style="color:#92400E">NT$ ${total.toLocaleString()}</span></div>
+       </div>`;
+  }
+
+  async function showBigPrintScreen(preOrderId, origin) {
+    _bpReturnOrderId = preOrderId || '';
+    _bpOrigin = origin || (preOrderId ? 'detail' : 'main');
+    showLoading(true, '載入大圖輸出紀錄...');
+    try {
+      const [oRes, bRes] = await Promise.all([
+        fetch(`${API_URL}?action=getAllOrders&code=${PASSCODE}`),
+        fetch(`${API_URL}?action=getBigPrints&code=${PASSCODE}&user=${encodeURIComponent(selectedUser)}`)
+      ]);
+      const oData = await oRes.json();
+      const bData = await bRes.json();
+      if (!bData.success) throw new Error(bData.error || '讀取失敗');
+      _bpAllOrders = oData.orders || [];
+      _bpList = bData.bigPrints || [];
+      showLoading(false);
+    } catch (err) { showLoading(false); showToast('❌ ' + err.message, 'error'); return; }
+    renderBigPrintList();
+    showScreen('bigprint-screen');
+    if (_bpOrigin === 'detail' && preOrderId) {
+      openBpForm('');
+      const ord = _bpAllOrders.find(o => String(o.id) === String(preOrderId));
+      if (ord) { const ud = document.getElementById('bp-usedate'); if (ud) { ud.value = ord.date; onBpUseDateChange(String(preOrderId)); } }
+    }
+  }
+
+  function renderBigPrintList() {
+    const body = document.getElementById('bigprint-body');
+    if (!body) return;
+    const fmt = n => 'NT$ ' + Number(n||0).toLocaleString();
+    const numv = v => Number(String(v||'').replace(/[^0-9.]/g,'')||0);
+    const total = _bpList.reduce((a,b)=>a+numv(b.amount),0);
+    const groups = {};
+    _bpList.forEach(b => { const k = String(b.useDate||'').slice(0,7) || '（未填使用日期）'; (groups[k]=groups[k]||[]).push(b); });
+    const keys = Object.keys(groups).sort((a,b)=>b.localeCompare(a));
+    let html = `
+      <button class="payment-save-btn" style="background:#B45309;margin:.2rem 0 .8rem" onclick="openBpForm('')">＋ 新增大圖輸出紀錄</button>
+      <div class="finance-type-card" style="border-left:4px solid #FCD34D;margin-bottom:.6rem">
+        <div class="finance-type-head"><span>共 ${_bpList.length} 筆 · 合計</span><span class="finance-type-sum" style="color:#92400E">${fmt(total)}</span></div>
+      </div>`;
+    if (!_bpList.length) {
+      html += '<div style="text-align:center;padding:2rem;color:var(--text-light)">尚無大圖輸出紀錄，點上方按鈕新增</div>';
+    } else {
+      keys.forEach(k => {
+        html += `<div style="font-weight:800;color:var(--text-mid);margin:.7rem 0 .35rem;font-size:.9rem">📅 ${k}</div>`;
+        html += groups[k].map(b => {
+          const amt = b.amount ? 'NT$ ' + numv(b.amount).toLocaleString() : '－';
+          const where = b.bound ? (esc(b.orderName)||'訂單') + '（' + esc(b.orderDate) + '）' : '⚠️ 未綁定';
+          return `
+          <div class="expense-card" style="border-left:4px solid #FCD34D" onclick="openBpForm('${esc(b.id)}')">
+            <div class="expense-card-row">
+              <span class="expense-type">🖼️ ${esc(b.item)||'（未填品項）'}${b.size?' · '+esc(b.size):''}</span>
+              <span style="font-weight:800;color:#92400E">${amt}</span>
+            </div>
+            <div class="expense-meta">使用日：${esc(b.useDate)||'－'} ｜ 場次：${esc(b.session)||'－'}</div>
+            <div class="expense-meta">歸屬：${where}${b.vendor?' ｜ 發包人：'+esc(b.vendor):''}${b.dispatchDate?' ｜ 發包日：'+esc(b.dispatchDate):''}</div>
+          </div>`;
+        }).join('');
+      });
+    }
+    body.innerHTML = html;
+  }
+
+  function _bpSessionOptions(useDate, selectedOrderId) {
+    const key = String(useDate||'');
+    const matches = _bpAllOrders.filter(o => String(o.date) === key);
+    const opts = matches.map(o => {
+      const label = _mmdd(o.date) + '/' + (o.clientName||'未命名') + (o.eventType?'（'+o.eventType+'）':'');
+      return `<option value="${esc(String(o.id))}" ${String(o.id)===String(selectedOrderId)?'selected':''}>${esc(label)}</option>`;
+    }).join('');
+    return { opts, count: matches.length };
+  }
+
+  function openBpForm(id) {
+    _bpEditId = id || '';
+    const rec = id ? _bpList.find(b => String(b.id) === String(id)) : null;
+    const useDate = rec ? rec.useDate : '';
+    const sel = _bpSessionOptions(useDate, rec ? rec.orderId : (_bpReturnOrderId||''));
+    const manualShown = rec ? !rec.bound : false;
+    document.getElementById('bigprint-form-title').textContent = id ? '✏️ 編輯大圖輸出紀錄' : '🖼️ 新增大圖輸出紀錄';
+    const head = useDate ? (sel.count?'— 請選擇當天場次 —':'（當天無場次，請改手動輸入）') : '— 請先選使用日期 —';
+    document.getElementById('bigprint-form-body').innerHTML = `
+      <div class="payment-field"><label>發包日期</label><input type="date" id="bp-dispatchdate" value="${esc(rec?rec.dispatchDate:'')}"></div>
+      <div class="payment-field"><label>使用日期 *</label><input type="date" id="bp-usedate" value="${esc(useDate)}" onchange="onBpUseDateChange()"></div>
+      <div class="payment-field"><label>使用場次 *</label>
+        <select id="bp-session" class="oc-select" onchange="onBpSessionChange()">
+          <option value="">${head}</option>
+          ${sel.opts}
+          <option value="__manual__" ${manualShown?'selected':''}>＋ 手動輸入（未綁定訂單）</option>
+        </select>
+      </div>
+      <div class="payment-field" id="bp-manual-wrap" style="display:${manualShown?'flex':'none'}"><label>手動場次</label><input type="text" id="bp-session-manual" value="${esc(manualShown&&rec?rec.session:'')}" placeholder="例：0614/台北君品"></div>
+      <div class="payment-field"><label>品項</label><input type="text" id="bp-item" value="${esc(rec?rec.item:'')}" placeholder="例：立體字、合成版"></div>
+      <div class="payment-field"><label>尺寸</label><input type="text" id="bp-size" value="${esc(rec?rec.size:'')}" placeholder="例：80x60"></div>
+      <div class="payment-field"><label>成本價</label><input type="number" id="bp-amount" value="${esc(rec?rec.amount:'')}" placeholder="例：320"></div>
+      <div class="payment-field"><label>發包人</label><input type="text" id="bp-vendor" value="${esc(rec?rec.vendor:'')}" placeholder="例：jpi"></div>
+      <div class="payment-field"><label>備註</label><input type="text" id="bp-note" value="${esc(rec?rec.note:'')}" placeholder="例：急件"></div>
+      <button class="payment-save-btn" style="background:#B45309" onclick="saveBigPrint()">💾 儲存大圖輸出紀錄</button>
+      ${id ? `<button class="delete-btn" onclick="deleteBigPrintConfirm('${esc(id)}')">🗑️ 刪除此筆</button>` : ''}
+    `;
+    document.getElementById('bigprint-modal').classList.remove('hidden');
+  }
+
+  function closeBpForm() { document.getElementById('bigprint-modal').classList.add('hidden'); }
+
+  function onBpUseDateChange(preselectOrderId) {
+    const useDate = document.getElementById('bp-usedate').value;
+    const sel = _bpSessionOptions(useDate, preselectOrderId||'');
+    const el = document.getElementById('bp-session');
+    const head = useDate ? (sel.count?'— 請選擇當天場次 —':'（當天無場次，請改手動輸入）') : '— 請先選使用日期 —';
+    el.innerHTML = `<option value="">${head}</option>${sel.opts}<option value="__manual__">＋ 手動輸入（未綁定訂單）</option>`;
+    if (preselectOrderId) { el.value = String(preselectOrderId); }
+    else if (useDate && !sel.count) { el.value = '__manual__'; }
+    onBpSessionChange();
+  }
+
+  function onBpSessionChange() {
+    const v = document.getElementById('bp-session').value;
+    const wrap = document.getElementById('bp-manual-wrap');
+    if (wrap) wrap.style.display = (v === '__manual__') ? 'flex' : 'none';
+  }
+
+  async function saveBigPrint() {
+    const useDate = document.getElementById('bp-usedate').value;
+    const sessSel = document.getElementById('bp-session').value;
+    if (!useDate) { showToast('請選擇使用日期', 'error'); return; }
+    if (!sessSel) { showToast('請選擇使用場次（或改手動輸入）', 'error'); return; }
+    let orderId = '', session = '';
+    if (sessSel === '__manual__') {
+      session = (document.getElementById('bp-session-manual').value || '').trim();
+      if (!session) { showToast('請輸入手動場次名稱', 'error'); return; }
+    } else {
+      orderId = sessSel;
+      const ord = _bpAllOrders.find(o => String(o.id) === String(orderId));
+      session = ord ? (_mmdd(ord.date) + '/' + (ord.clientName||'未命名')) : '';
+    }
+    const rec = {
+      dispatchDate: document.getElementById('bp-dispatchdate').value,
+      useDate: useDate, session: session,
+      item: document.getElementById('bp-item').value,
+      size: document.getElementById('bp-size').value,
+      amount: document.getElementById('bp-amount').value,
+      vendor: document.getElementById('bp-vendor').value,
+      note: document.getElementById('bp-note').value
+    };
+    const action = _bpEditId ? 'updateBigPrint' : 'addBigPrint';
+    const body = { action, code:PASSCODE, user:selectedUser, record:rec, orderId: orderId };
+    if (_bpEditId) body.id = _bpEditId;
+    showLoading(true, '儲存大圖輸出紀錄...');
+    try {
+      const res = await fetch(API_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body:JSON.stringify(body) });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || '儲存失敗');
+      await _bpReloadInto(orderId);
+      showLoading(false);
+      showToast('✅ 大圖輸出紀錄已儲存', 'success');
+      closeBpForm();
+      await _bpRefreshList();
+    } catch (err) { showLoading(false); showToast('❌ 儲存失敗：' + err.message, 'error'); }
+  }
+
+  async function _bpRefreshList() {
+    try {
+      const bRes = await fetch(`${API_URL}?action=getBigPrints&code=${PASSCODE}&user=${encodeURIComponent(selectedUser)}`);
+      const bData = await bRes.json();
+      if (bData.success) { _bpList = bData.bigPrints || []; renderBigPrintList(); }
+    } catch (e) { /* ignore */ }
+  }
+
+  // 重新抓某訂單 col28，更新本地快取（雙向同步即時生效）
+  async function _bpReloadInto(orderId) {
+    if (!orderId) return;
+    try {
+      const res = await fetch(`${API_URL}?action=getAllOrders&code=${PASSCODE}`);
+      const data = await res.json();
+      if (!data.success) return;
+      const fresh = (data.orders||[]).find(o => String(o.id) === String(orderId));
+      if (!fresh) return;
+      const ao = allOrders.find(o => String(o.id) === String(orderId)); if (ao) ao.orderExpenses = fresh.orderExpenses;
+      const bo = _bpAllOrders.find(o => String(o.id) === String(orderId)); if (bo) bo.orderExpenses = fresh.orderExpenses;
+    } catch (e) { /* ignore */ }
+  }
+
+  function deleteBigPrintConfirm(id) {
+    if (!confirm('確定刪除這筆大圖輸出紀錄？此筆成本也會從對應訂單移除。')) return;
+    _doDeleteBigPrint(id);
+  }
+  async function _doDeleteBigPrint(id) {
+    const rec = _bpList.find(b => String(b.id) === String(id));
+    showLoading(true, '刪除中...');
+    try {
+      const body = { action:'deleteBigPrint', code:PASSCODE, user:selectedUser, id:id, orderId:(rec?rec.orderId:'') };
+      const res = await fetch(API_URL, { method:'POST', headers:{'Content-Type':'text/plain'}, body:JSON.stringify(body) });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || '刪除失敗');
+      if (rec && rec.orderId) await _bpReloadInto(rec.orderId);
+      showLoading(false);
+      showToast('✅ 已刪除', 'success');
+      closeBpForm();
+      await _bpRefreshList();
+    } catch (err) { showLoading(false); showToast('❌ ' + err.message, 'error'); }
+  }
+
+  function backFromBigPrint() {
+    if (_bpOrigin === 'detail' && _bpReturnOrderId) { showDetail(_bpReturnOrderId); return; }
+    if (_bpOrigin === 'finance') { showScreen('finance-screen'); _financeTab = 'expense'; switchFinanceTab('expense'); return; }
+    showMain();
+  }
 
   // ===== v4.0 入帳明細頁 =====
   function showIncomeDetail(kind) {
